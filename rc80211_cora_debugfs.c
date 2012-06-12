@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Tiago Chedraoui Silva <tsilva@lrc.ic.unicamp.br>
+ * Copyright (C) 2010 Luciano Jerez Chaves <luciano@lrc.ic.unicamp.br>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -7,6 +7,7 @@
  *
  * Based on rc80211_minstrel_debugfs.c:
  *   Copyright (C) 2008 Felix Fietkau <nbd@openwrt.org>
+ *   Copyright (C) 2010 Tiago Chedraoui Silva <tsilva@lrc.ic.unicamp.br>
  *
  * Based on minstrel.c:
  *   Copyright (C) 2005-2007 Derek Smithies <derek@indranet.co.nz>
@@ -73,7 +74,7 @@ cora_stats_open (struct inode *inode, struct file *file)
 
 	/* Table header */
 	p += sprintf(p, "\n Rate Table:\n");
-	p += sprintf(p, "    | rate | avg_thp | avg_pro | cur_thp | cur_pro | "
+	p += sprintf(p, "   | rate | avg_thp | avg_pro | cur_thp | cur_pro | "
 			"succ ( atte ) | success | attempts | #used \n");
 
 	/* Table lines */
@@ -85,7 +86,6 @@ cora_stats_open (struct inode *inode, struct file *file)
 		 * for the rate been used now */
 		*(p++) = (i == ci->random_rate_ndx)		? '*' : ' ';
 		*(p++) = (i == ci->max_tp_rate_ndx) 	? 'T' : ' ';   
-		*(p++) = (i == ci->max_prob_rate_ndx) 	? 'P' : ' ';   
 
 		p += sprintf(p, " |%3u%s ", cr->bitrate / 2,
 				(cr->bitrate & 1 ? ".5" : "  "));
@@ -111,55 +111,14 @@ cora_stats_open (struct inode *inode, struct file *file)
 			);
 	}
 
-	/* Chain table  */
-	p += sprintf(p, "\n MRR Chain Table:\n");
-	p += sprintf(p, " type |  rate | count | success | attempts \n");
-
-	for (i = 0; i < 4; i++) {
-		struct chain_table *ct = &ci->t[i];
-
-		p += sprintf (
-			p, 
-			" %s | %3u%s | %5u | %7llu | %8llu\n",
-			ct->type == 0 ? "rand": ct->type == 1 ? "best" : ct->type == 2 ? "prob" : "lowr", 
-			ct->bitrate / 2, (ct->bitrate & 1 ? ".5" : "  "),
-			ct->count,
-			(unsigned long long) ct->suc,
-			(unsigned long long) ct->att
-		);
-	}
-
 	/* Table footer */
 	p += sprintf(p, "\n COgnitive Rate Adaptation (CORA):\n"
-			"   Number of rates:      %u\n"
-			"   Recovery Mode:        %s\n"
-			"   Interval based on:    %s  (current interval: %u)\n"
-			"   MRR table inversion:  %s\n"
-			"   AAA trigger type:     %s\n"
-			"   Current Normal Mean:  %u\n"
-		   	"   Current Normal Stdev: %u.%2u\n",
+			"   Number of rates: %u\n"
+			"   Update interval: %u\n"
+			"   Normal Mean:     %u\n"
+		   	"   Normal Stdev:    %u.%2u\n",
 			ci->n_rates,
-#ifdef CORA_FAST_RECOVERY
-			"ENABLE",
-#else
-			"DISABLE",
-#endif
-#ifdef CORA_PKT_BASED
-			"PACKETS",
-#else
-			"TIME",
-#endif
 			ci->update_interval,
-#ifdef CORA_INVERT_MRR
-			"ENABLE",
-#else
-			"DISABLE",
-#endif
-#ifdef CORA_AAA_THP_CHANGE
-			"THROUGHPUT",
-#else
-			"NORMAL MEAN",
-#endif
 			ci->max_tp_rate_ndx,
 			ci->cur_stdev / 100, ci->cur_stdev % 100
 		);

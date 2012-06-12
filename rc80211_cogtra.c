@@ -457,20 +457,14 @@ cogtra_rate_init (void *priv, struct ieee80211_supported_band *sband,
 	struct ieee80211_local *local = hw_to_local(cp->hw);
 	struct ieee80211_rate *ctl_rate;
 	unsigned int i, n = 0;
-	unsigned int t_slot = 9;
-	unsigned int sp_ack_dur;
 
 	/* Get the lowest index rate and calculate the duration of a ack tx */
 	ci->lowest_rix = rate_lowest_index (sband, sta);
 	ctl_rate = &sband->bitrates[ci->lowest_rix];
-	sp_ack_dur = ieee80211_frame_duration (local, 10, ctl_rate->bitrate,
-			!!(ctl_rate->flags & IEEE80211_RATE_ERP_G), 1);
 
 	/* Populating information for each supported rate */
 	for (i = 0; i < sband->n_bitrates; i++) {
 		struct cogtra_rate *cr = &ci->r[n];
-		unsigned int tx_time = 0;
-		unsigned int cw = cp->cw_min;
 
 		/* Check rate support */
 		if (!rate_supported (sta, sband->band, i))
@@ -483,19 +477,6 @@ cogtra_rate_init (void *priv, struct ieee80211_supported_band *sband,
 		cr->rix = i;
 		cr->bitrate = sband->bitrates[i].bitrate / 5;
 		calc_rate_durations (local, cr, &sband->bitrates[i]);
-
-		/* Calculate maximum number of retransmissions before
-		 * fallback (based on maximum segment size) */
-		cr->retry_count = 1;
-		
-		do {
-			/* Add one retransmission and contention window */
-			tx_time += cr->perfect_tx_time + cr->ack_time + t_slot + 
-					min (cw, cp->cw_max);
-			cw = (cw << 1) | 1;
-
-		} while ((tx_time < cp->segment_time) &&
-			 	(++cr->retry_count < cp->max_retry));
 	}
 
 	/* Sort rates based on bitrate */
@@ -578,12 +559,7 @@ cogtra_alloc (struct ieee80211_hw *hw, struct dentry *debugfsdir)
 		return NULL;
 
 	/* Default cogtra values */
-	cp->cw_min = 15;
-	cp->cw_max = 1023;
 	cp->ewma_level = COGTRA_EWMA_LEVEL;
-
- 	/* Max time the hw can stay in one MRR segment */
-	cp->segment_time = 4000;
 
 	/* Max number of retries and MRR support */
 	cp->max_retry = hw->max_rate_tries > 0 ? hw->max_rate_tries : 7;
@@ -619,7 +595,7 @@ struct rate_control_ops mac80211_cogtra = {
 int __init
 rc80211_cogtra_init(void)
 {
-	printk ("LJC & TCS COGTRA algorithm.\n");
+	printk ("LJC CogTRA algorithm.\n");
 	return ieee80211_rate_control_register (&mac80211_cogtra);
 }
 

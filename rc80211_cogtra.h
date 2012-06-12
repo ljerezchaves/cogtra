@@ -92,11 +92,8 @@ struct cogtra_sta_info {
 struct cogtra_priv {
 	struct ieee80211_hw *hw;	  	// hardware properties 
 	bool has_mrr;				  	// mrr support
-	unsigned int cw_min;		  	// congestion window base
-	unsigned int cw_max;		  	// congestion window roof
 	unsigned int max_retry;		  	// default max number o retries before frame discard
 	unsigned int ewma_level;	  	// ewma alpha for ammortize throughput.
-	unsigned int segment_time;	  	// maximum time allowed at the same mrr segment
 };
 
 

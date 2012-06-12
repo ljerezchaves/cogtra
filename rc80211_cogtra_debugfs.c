@@ -131,7 +131,7 @@ cogtra_stats_open (struct inode *inode, struct file *file)
 	}
 
 	/* Table footer */
-	p += sprintf(p, "\n COgnitive Rate Adaptation (COGTRA):\n"
+	p += sprintf(p, "\n Cognitive Transmission Rate Adaptation (CogTRA):\n"
 			"   Number of rates:      %u\n"
 			"   Current pkt interval: %u\n"
 			"   Current Normal Mean:  %u\n"

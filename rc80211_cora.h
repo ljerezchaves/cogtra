@@ -14,27 +14,9 @@
 #define __RC_CORA_H
 
 /* Cora custom code optimization */
-#define CORA_FAST_RECOVERY				// short update interval when using lower random rates
-#define CORA_PKT_BASED					// select packet based adaptation
-#define CORA_AAA_THP_CHANGE				// aaa activated only by expressive thp changes
-//#define CORA_INVERT_MRR					// invert mrr chain table when using lower random rates
-//#define CORA_AAA_MIXED					// aaa activated by both thp and average changes
-
-#define CORA_MAX_STDEV			150
-#define CORA_MIN_STDEV			40
+#define CORA_STDEV			    80
 #define CORA_EWMA_LEVEL			30
-#define CORA_UPDATE_INTERVAL	150		// for packet-based
-#define CORA_RECOVERY_INTERVAL	20		// for packet-based
-
-struct chain_table {
-	unsigned int type;
-	unsigned int count;
-	int bitrate;
-	int rix;
-	u32 att;
-	u32 suc;
-};
-
+#define CORA_UPDATE_INTERVAL	100
 
 /* cora_rate is allocated once for each available rate at each cora_sta_info.
  * Information in this struct is private to this rate at this station */ 
@@ -76,16 +58,14 @@ struct cora_rate {
 struct cora_sta_info {
 	unsigned int cur_stdev;			// current normal stdev
 	unsigned int max_tp_rate_ndx;	// index of rate with highest thp (current normal mean)
-	unsigned int max_prob_rate_ndx;	// index of rate with highest probability
 	unsigned int random_rate_ndx;	// random rate index (will be used in the next interval) 
 	unsigned int lowest_rix;		// lowest rate index 
 	unsigned int n_rates;			// number o supported rates 
-	unsigned long update_counter;	// last update time (time based) or pkt counter (pkt based)
-    unsigned int update_interval; 	// time (or pkts) between cora_update_stats
+	unsigned long update_counter;	// last update time
+    unsigned int update_interval; 	// time between cora_update_stats
 	unsigned long up_stats_counter;	// update stats counter
 	
 	struct cora_rate *r;			// rate pointer for each station
-	struct chain_table *t;			// chain table pointer for mrr
 
 #ifdef CONFIG_MAC80211_DEBUGFS
 	struct dentry *dbg_stats;		// debug file pointer 
@@ -97,7 +77,6 @@ struct cora_sta_info {
  * cora_sta_info. */
 struct cora_priv {
 	struct ieee80211_hw *hw;	  	// hardware properties 
-	bool has_mrr;				  	// mrr support
 	unsigned int cw_min;		  	// congestion window base
 	unsigned int cw_max;		  	// congestion window roof
 	unsigned int max_retry;		  	// default max number o retries before frame discard
