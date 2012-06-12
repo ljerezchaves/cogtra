@@ -4,7 +4,6 @@
  * Based on rc80211_minstrel.h:
  * Copyright (C) 2008 Felix Fietkau <nbd@openwrt.org>
  * Copyright (C) 2010 Tiago Chedraoui Silva <tsilva@lrc.ic.unicamp.br>
- * Copyright (C) 2012 Luciano Jerez Chaves <luciano@lrc.ic.unicamp.br>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,17 +14,11 @@
 #define __RC_COGTRA_H
 
 /* Cogtra custom code optimization */
-#define COGTRA_FAST_RECOVERY				// short update interval when using lower random rates
-#define COGTRA_PKT_BASED					// select packet based adaptation
-#define COGTRA_AAA_THP_CHANGE				// aaa activated only by expressive thp changes
-//#define COGTRA_INVERT_MRR					// invert mrr chain table when using lower random rates
-//#define COGTRA_AAA_MIXED					// aaa activated by both thp and average changes
-
 #define COGTRA_MAX_STDEV			150
 #define COGTRA_MIN_STDEV			40
 #define COGTRA_EWMA_LEVEL			30
-#define COGTRA_UPDATE_INTERVAL	150		// for packet-based
-#define COGTRA_RECOVERY_INTERVAL	20		// for packet-based
+#define COGTRA_UPDATE_INTERVAL	    150
+#define COGTRA_RECOVERY_INTERVAL	20
 
 struct chain_table {
 	unsigned int type;

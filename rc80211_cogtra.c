@@ -8,7 +8,6 @@
  * Based on rc80211_minstrel.c:
  *   Copyright (C) 2008 Felix Fietkau <nbd@openwrt.org>
  *   Copyright (C) 2010 Tiago Chedraoui Silva <tsilva@lrc.ic.unicamp.br>
- *   Copyright (C) 2012 Luciano Jerez Chaves <luciano@lrc.ic.unicamp.br>
  *
  *   Redistribution and use in source and binary forms, with or without
  *   modification, are permitted provided that the following conditions
@@ -53,7 +52,6 @@
 #include "rc80211_cogtra.h"
 
 /* COGTRA Automatic Agressivness Adjustment (AAA) */
-#ifdef COGTRA_AAA_THP_CHANGE
 static inline int
 cogtra_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp, 
 		u32 curr_thp, unsigned int stdev)
@@ -67,32 +65,6 @@ cogtra_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp,
 	else
 		return max (stdev - 10, (unsigned int) COGTRA_MIN_STDEV);
 } 
-#else
-  #ifdef COGTRA_AAA_MIXED
-static inline int
-cogtra_aaa_mixed (unsigned int last_mean, unsigned int curr_mean, u32 last_thp, 
-		u32 curr_thp, u32 thp_newrate, unsigned int stdev)
-{
-	u32 delta = last_thp / 10;
-
-	/* Check for more new rate with more than 10% thp increase */
-	if ((curr_mean != last_mean) && (thp_newrate - delta > curr_thp))
-		return min (stdev + 30, (unsigned int)COGTRA_MAX_STDEV);
-	else
-		return max (stdev - 10, (unsigned int)COGTRA_MIN_STDEV);
-}
-  #else
-static inline int
-cogtra_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp, 
-		u32 curr_thp, unsigned int stdev)
-{
-	if (curr_mean != last_mean)
-		return min (stdev * 2,  (unsigned int)COGTRA_MAX_STDEV);
-	else
-		return max (stdev - 10, (unsigned int)COGTRA_MIN_STDEV);
-}
-  #endif
-#endif
 
 /* COGTRA Normal random number generator. 
  * stdev parameter has to be stedv * 100 (to avoid FP operations) */
@@ -272,34 +244,6 @@ cogtra_mrr_populate (struct cogtra_sta_info *ci)
 	ct[3].rix = ci->lowest_rix;
 	ct[3].bitrate = ci->r[0].bitrate;
 	ct[3].count = 2U;
-
-#ifdef COGTRA_INVERT_MRR
-	if (ci->r[ci->random_rate_ndx].perfect_tx_time >
-			ci->r[ci->max_tp_rate_ndx].perfect_tx_time) {
-		/* RANDOM < BEST */
-		
-		/* If the randomly selected rate is slower than the current best
-		 * throughput, the randomly selected rate is placed second in mrr
-		 * table. If the link is not good, then there will be data collected at
-		 * the randomly selected rate. Thus, if the best throughput rate is
-		 * currently 54 Mbps, the only time slower rates are sampled is when a
-		 * packet fails in transmission. Consequently, if the link is ideal,
-		 * all packets will be sent at the full rate of 54 Mbps, which is good.
-		 */
-
-		/* Best throughput */
-		ct[0].type = 1;	
-		ct[0].rix = ci->r[ci->max_tp_rate_ndx].rix;
-		ct[0].bitrate = ci->r[ci->max_tp_rate_ndx].bitrate;
-		ct[0].count = 2U;
-
-		/* Random COGTRA rate */
-		ct[1].type = 0;	
-		ct[1].rix = ci->r[ci->random_rate_ndx].rix;
-		ct[1].bitrate = ci->r[ci->random_rate_ndx].bitrate;
-		ct[1].count = 2U;
-	}
-#endif	
 }
 
 
@@ -373,20 +317,11 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 	}
 	ci->max_tp_rate_ndx = max_tp_ndx;
 	ci->max_prob_rate_ndx = max_prob_ndx;
-
-#ifdef COGTRA_PKT_BASED
 	ci->update_counter = 0UL;
-#else
-	ci->update_counter = jiffies;
-#endif
 
 	/* Adjusting stdev with CogTRA AAA */
-#ifdef COGTRA_AAA_MIXED
-	ci->cur_stdev = cogtra_aaa_mixed (old_mean, ci->max_tp_rate_ndx, old_thp, new_thp, max_tp, old_stdev);
-#else
 	ci->cur_stdev = cogtra_aaa (old_mean, ci->max_tp_rate_ndx,
 			old_thp, new_thp, old_stdev);
-#endif
 
 	/* Get a new random rate for next interval (using a normal distribution) */
 	random = rc80211_cogtra_normal_generator ((int)ci->max_tp_rate_ndx,
@@ -397,9 +332,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 
 	cogtra_mrr_populate (ci);
 
-#ifdef COGTRA_FAST_RECOVERY
 	/* Adjust update_interval dependending on the random rate */
-	
 	/* RANDOM < BEST || RANDOM.PROB < 10% */
 	if ((ci->r[ci->random_rate_ndx].perfect_tx_time >
 				ci->r[ci->max_tp_rate_ndx].perfect_tx_time) ||
@@ -407,7 +340,6 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 		ci->update_interval = COGTRA_RECOVERY_INTERVAL;
 	else
 		ci->update_interval = COGTRA_UPDATE_INTERVAL;
-#endif
 }
 
 
@@ -441,9 +373,7 @@ cogtra_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	
 		/* Increasing attempts counter */
 		ci->r[ndx].attempts += ar[i].count;
-#ifdef COGTRA_PKT_BASED
 		ci->update_counter += ar[i].count;
-#endif
 		ct[i].att += ar[i].count;
 	
 		/* If it is the last used rate and resultesd in tx success, also
@@ -479,14 +409,8 @@ cogtra_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	mrr = cp->has_mrr && !txrc->rts && !txrc->bss_conf->use_cts_prot;
 
 	/* Check the need of an update_stats based on update_interval */
-#ifdef COGTRA_PKT_BASED
 	if (ci->update_counter >= ci->update_interval)
 		cogtra_update_stats (cp, ci);
-#else
-	if (time_after (jiffies, ci->update_counter + 
-			(ci->update_interval * HZ) / 1000))
-		cogtra_update_stats (cp, ci);
-#endif
 
 	/* Setting up tx rate information. 
 	 * Be careful to convert ndx indexes into ieee80211_tx_rate indexes */
@@ -583,12 +507,7 @@ cogtra_rate_init (void *priv, struct ieee80211_supported_band *sband,
 
 	ci->cur_stdev = COGTRA_MAX_STDEV;
 	ci->n_rates = n;
-
-#ifdef COGTRA_PKT_BASED
 	ci->update_counter = 0UL;
-#else
-	ci->update_counter = jiffies;
-#endif
 }
 
 
@@ -630,13 +549,7 @@ cogtra_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 	}
 
 	ci->update_interval = COGTRA_UPDATE_INTERVAL;
-#ifdef COGTRA_PKT_BASED
 	ci->update_counter = 0UL;
-#else
-	/* The Linux kernel maintains a global variable called jiffies, which
-	 * represents the number of timer ticks since the machine started. */
-	ci->update_counter = jiffies;
-#endif
 
 	return ci;
 }

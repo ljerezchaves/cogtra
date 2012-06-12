@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2010 Tiago Chedraoui Silva <tsilva@lrc.ic.unicamp.br>
  * Copyright (C) 2012 Luciano Jerez Chaves <luciano@lrc.ic.unicamp.br>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -8,6 +7,7 @@
  *
  * Based on rc80211_minstrel_debugfs.c:
  *   Copyright (C) 2008 Felix Fietkau <nbd@openwrt.org>
+ *   Copyright (C) 2010 Tiaho Chedraiou Silva <tsilva@lrc.ic.unicamp.br>
  *
  * Based on minstrel.c:
  *   Copyright (C) 2005-2007 Derek Smithies <derek@indranet.co.nz>
@@ -133,34 +133,11 @@ cogtra_stats_open (struct inode *inode, struct file *file)
 	/* Table footer */
 	p += sprintf(p, "\n COgnitive Rate Adaptation (COGTRA):\n"
 			"   Number of rates:      %u\n"
-			"   Recovery Mode:        %s\n"
-			"   Interval based on:    %s  (current interval: %u)\n"
-			"   MRR table inversion:  %s\n"
-			"   AAA trigger type:     %s\n"
+			"   Current pkt interval: %u\n"
 			"   Current Normal Mean:  %u\n"
 		   	"   Current Normal Stdev: %u.%2u\n",
 			ci->n_rates,
-#ifdef COGTRA_FAST_RECOVERY
-			"ENABLE",
-#else
-			"DISABLE",
-#endif
-#ifdef COGTRA_PKT_BASED
-			"PACKETS",
-#else
-			"TIME",
-#endif
 			ci->update_interval,
-#ifdef COGTRA_INVERT_MRR
-			"ENABLE",
-#else
-			"DISABLE",
-#endif
-#ifdef COGTRA_AAA_THP_CHANGE
-			"THROUGHPUT",
-#else
-			"NORMAL MEAN",
-#endif
 			ci->max_tp_rate_ndx,
 			ci->cur_stdev / 100, ci->cur_stdev % 100
 		);
