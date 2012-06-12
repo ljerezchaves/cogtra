@@ -204,8 +204,8 @@ static void
 cora_update_stats (struct cora_priv *cp, struct cora_sta_info *ci)
 {
 	u32 usecs;
-	u32 max_tp = 0, max_prob = 0;
-	unsigned int i, max_tp_ndx, max_prob_ndx;
+	u32 max_tp = 0;
+	unsigned int i, max_tp_ndx;
 	int random = 0;
 
 	ci->up_stats_counter++;
@@ -311,7 +311,6 @@ cora_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	struct cora_sta_info *ci = priv_sta;
 	struct cora_priv *cp = priv;
 	struct ieee80211_tx_rate *ar = info->control.rates;
-	int i;
 
 	/* Check for management or control packet, which should be transmitted
 	 * unsing lower rate */
@@ -359,20 +358,14 @@ cora_rate_init (void *priv, struct ieee80211_supported_band *sband,
 	struct ieee80211_local *local = hw_to_local(cp->hw);
 	struct ieee80211_rate *ctl_rate;
 	unsigned int i, n = 0;
-	unsigned int t_slot = 9;
-	unsigned int sp_ack_dur;
 
 	/* Get the lowest index rate and calculate the duration of a ack tx */
 	ci->lowest_rix = rate_lowest_index (sband, sta);
 	ctl_rate = &sband->bitrates[ci->lowest_rix];
-	sp_ack_dur = ieee80211_frame_duration (local, 10, ctl_rate->bitrate,
-			!!(ctl_rate->flags & IEEE80211_RATE_ERP_G), 1);
 
 	/* Populating information for each supported rate */
 	for (i = 0; i < sband->n_bitrates; i++) {
 		struct cora_rate *cr = &ci->r[n];
-		unsigned int tx_time = 0;
-		unsigned int cw = cp->cw_min;
 
 		/* Check rate support */
 		if (!rate_supported (sta, sband->band, i))
