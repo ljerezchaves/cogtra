@@ -578,7 +578,7 @@ cogtra_free (void *priv)
 }
 
 struct rate_control_ops mac80211_cogtra = {
-	.name = "cogtra",
+	.name = "cogtra_ht",
 	.tx_status = cogtra_tx_status,
 	.get_rate = cogtra_get_rate,
 	.rate_init = cogtra_rate_init,
