@@ -10,15 +10,15 @@
  * published by the Free Software Foundation.
  */
 
-#ifndef __RC_COGTRA_H
-#define __RC_COGTRA_H
+#ifndef __RC_COGTRA_HT_H
+#define __RC_COGTRA_HT_H
 
-/* Cogtra custom code optimization */
-#define COGTRA_MAX_STDEV			150
-#define COGTRA_MIN_STDEV			40
-#define COGTRA_EWMA_LEVEL			30
-#define COGTRA_UPDATE_INTERVAL	    150
-#define COGTRA_RECOVERY_INTERVAL	20
+/* Cogtra_HT custom code optimization */
+#define COGTRA_HT_MAX_STDEV			150
+#define COGTRA_HT_MIN_STDEV			40
+#define COGTRA_HT_EWMA_LEVEL			30
+#define COGTRA_HT_UPDATE_INTERVAL	    150
+#define COGTRA_HT_RECOVERY_INTERVAL	20
 
 struct chain_table {
 	unsigned int type;
@@ -30,9 +30,9 @@ struct chain_table {
 };
 
 
-/* cogtra_rate is allocated once for each available rate at each cogtra_sta_info.
+/* cogtra_ht_rate is allocated once for each available rate at each cogtra_ht_sta_info.
  * Information in this struct is private to this rate at this station */ 
-struct cogtra_rate {
+struct cogtra_ht_rate {
 	int bitrate;
 	int rix;
 
@@ -56,18 +56,18 @@ struct cogtra_rate {
 	u32 attempts;					// during last interval
 	u64 succ_hist;					// since ever 
 	u64 att_hist;					// since ever
-	u32 last_attempts;				// before last cogtra_update_stats
-	u32 last_success;				// before last cogtra_update_stats
+	u32 last_attempts;				// before last cogtra_ht_update_stats
+	u32 last_success;				// before last cogtra_ht_update_stats
 	
-	/* Number of times this rate was used by cogtra */
+	/* Number of times this rate was used by cogtra_ht */
 	u32 times_called;
 };
 
 
 
-/* cogtra_sta_info is allocated once per station. Information in this strcut
+/* cogtra_ht_sta_info is allocated once per station. Information in this strcut
  * allows independed rate adaptation for each station */
-struct cogtra_sta_info {
+struct cogtra_ht_sta_info {
 	unsigned int cur_stdev;			// current normal stdev
 	unsigned int max_tp_rate_ndx;	// index of rate with highest thp (current normal mean)
 	unsigned int max_prob_rate_ndx;	// index of rate with highest probability
@@ -75,10 +75,10 @@ struct cogtra_sta_info {
 	unsigned int lowest_rix;		// lowest rate index 
 	unsigned int n_rates;			// number o supported rates 
 	unsigned long update_counter;	// last update time (time based) or pkt counter (pkt based)
-    unsigned int update_interval; 	// time (or pkts) between cogtra_update_stats
+    unsigned int update_interval; 	// time (or pkts) between cogtra_ht_update_stats
 	unsigned long up_stats_counter;	// update stats counter
 	
-	struct cogtra_rate *r;			// rate pointer for each station
+	struct cogtra_ht_rate *r;			// rate pointer for each station
 	struct chain_table *t;			// chain table pointer for mrr
 
 #ifdef CONFIG_MAC80211_DEBUGFS
@@ -87,9 +87,9 @@ struct cogtra_sta_info {
 };
 
 
-/* cogtra_priv is allocated once. Information in this struct is shared among all
- * cogtra_sta_info. */
-struct cogtra_priv {
+/* cogtra_ht_priv is allocated once. Information in this struct is shared among all
+ * cogtra_ht_sta_info. */
+struct cogtra_ht_priv {
 	struct ieee80211_hw *hw;	  	// hardware properties 
 	bool has_mrr;				  	// mrr support
 	unsigned int max_retry;		  	// default max number o retries before frame discard
@@ -98,20 +98,20 @@ struct cogtra_priv {
 
 
 /* Common functions */
-extern struct rate_control_ops mac80211_cogtra;
-void cogtra_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir);
-void cogtra_remove_sta_debugfs (void *priv, void *priv_sta);
+extern struct rate_control_ops mac80211_cogtra_ht;
+void cogtra_ht_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir);
+void cogtra_ht_remove_sta_debugfs (void *priv, void *priv_sta);
 
 /* Debugfs */
-struct cogtra_debugfs_info {
+struct cogtra_ht_debugfs_info {
 	size_t len;
 	char buf[];
 };
 
-int cogtra_stats_open (struct inode *inode, struct file *file);
-ssize_t cogtra_stats_read (struct file *file, char __user *buf, size_t len, 
+int cogtra_ht_stats_open (struct inode *inode, struct file *file);
+ssize_t cogtra_ht_stats_read (struct file *file, char __user *buf, size_t len, 
 		loff_t *ppos);
-int cogtra_stats_release (struct inode *inode, struct file *file);
+int cogtra_ht_stats_release (struct inode *inode, struct file *file);
 
 #endif
 

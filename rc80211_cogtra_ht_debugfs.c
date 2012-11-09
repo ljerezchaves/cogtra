@@ -55,13 +55,13 @@
 #include <linux/ieee80211.h>
 #include <linux/slab.h>
 #include <net/mac80211.h>
-#include "rc80211_cogtra.h"
+#include "rc80211_cogtra_ht.h"
 
 int
-cogtra_stats_open (struct inode *inode, struct file *file)
+cogtra_ht_stats_open (struct inode *inode, struct file *file)
 {
-	struct cogtra_sta_info *ci = inode->i_private;
-	struct cogtra_debugfs_info *cs;
+	struct cogtra_ht_sta_info *ci = inode->i_private;
+	struct cogtra_ht_debugfs_info *cs;
 	unsigned int i, avg_tp, avg_prob, cur_tp, cur_prob;
 	char *p;
 
@@ -79,7 +79,7 @@ cogtra_stats_open (struct inode *inode, struct file *file)
 
 	/* Table lines */
 	for (i = 0; i < ci->n_rates; i++) {
-		struct cogtra_rate *cr = &ci->r[i];
+		struct cogtra_ht_rate *cr = &ci->r[i];
 
 		/* Print T for the rate with highest throughput (the mean of normal
 		 * curve), P for the rate with hisgest delivery probability and print *
@@ -131,7 +131,7 @@ cogtra_stats_open (struct inode *inode, struct file *file)
 	}
 
 	/* Table footer */
-	p += sprintf(p, "\n Cognitive Transmission Rate Adaptation (CogTRA):\n"
+	p += sprintf(p, "\n Cognitive Transmission Rate Adaptation High Throughput(CogTRA_HT):\n"
 			"   Number of rates:      %u\n"
 			"   Current pkt interval: %u\n"
 			"   Current Normal Mean:  %u\n"
@@ -147,41 +147,41 @@ cogtra_stats_open (struct inode *inode, struct file *file)
 }
 
 ssize_t
-cogtra_stats_read (struct file *file, char __user *buf, size_t len, loff_t *ppos)
+cogtra_ht_stats_read (struct file *file, char __user *buf, size_t len, loff_t *ppos)
 {
-	struct cogtra_debugfs_info *cs;
+	struct cogtra_ht_debugfs_info *cs;
 
 	cs = file->private_data;
 	return simple_read_from_buffer (buf, len, ppos, cs->buf, cs->len);
 }
 
 int
-cogtra_stats_release (struct inode *inode, struct file *file)
+cogtra_ht_stats_release (struct inode *inode, struct file *file)
 {
 	kfree (file->private_data);
 	return 0;
 }
 
-static const struct file_operations cogtra_stat_fops = {
+static const struct file_operations cogtra_ht_stat_fops = {
 	.owner = THIS_MODULE,
-	.open = cogtra_stats_open,
-	.read = cogtra_stats_read,
-	.release = cogtra_stats_release,
+	.open = cogtra_ht_stats_open,
+	.read = cogtra_ht_stats_read,
+	.release = cogtra_ht_stats_release,
 };
 
 void
-cogtra_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir)
+cogtra_ht_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir)
 {
-	struct cogtra_sta_info *ci = priv_sta;
+	struct cogtra_ht_sta_info *ci = priv_sta;
 
 	ci->dbg_stats = debugfs_create_file ("rc_stats", S_IRUGO, dir,
-			ci, &cogtra_stat_fops); 
+			ci, &cogtra_ht_stat_fops); 
 }
 
 void
-cogtra_remove_sta_debugfs(void *priv, void *priv_sta)
+cogtra_ht_remove_sta_debugfs(void *priv, void *priv_sta)
 {
-	struct cogtra_sta_info *ci = priv_sta;
+	struct cogtra_ht_sta_info *ci = priv_sta;
 	
 	debugfs_remove (ci->dbg_stats);
 }
