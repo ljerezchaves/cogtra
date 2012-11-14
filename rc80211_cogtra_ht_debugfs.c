@@ -55,16 +55,25 @@
 #include <linux/ieee80211.h>
 #include <linux/slab.h>
 #include <net/mac80211.h>
+#include "rc80211_cogtra.h"
 #include "rc80211_cogtra_ht.h"
 
 int
 cogtra_ht_stats_open (struct inode *inode, struct file *file)
 {
-	struct cogtra_ht_sta_info *ci = inode->i_private;
-	struct cogtra_ht_debugfs_info *cs;
+	struct cogtra_ht_sta_priv *csp = inode->i_private;
+	struct cogtra_ht_sta *ci = &csp->ht;
+	struct cogtra_debugfs_info *cs;
 	unsigned int i, avg_tp, avg_prob, cur_tp, cur_prob;
 	char *p;
-
+	
+	if (!csp->is_ht) {
+		inode->i_private = &csp->legacy;
+		ret = cogtra_stats_open(inode, file);
+		inode->i_private = csp;
+		return ret;
+	}
+	
 	cs = kmalloc (sizeof (*cs) + 4096, GFP_KERNEL);
 	if (!cs)
 		return -ENOMEM;
@@ -146,6 +155,7 @@ cogtra_ht_stats_open (struct inode *inode, struct file *file)
 	return 0;
 }
 
+/*
 ssize_t
 cogtra_ht_stats_read (struct file *file, char __user *buf, size_t len, loff_t *ppos)
 {
@@ -154,34 +164,39 @@ cogtra_ht_stats_read (struct file *file, char __user *buf, size_t len, loff_t *p
 	cs = file->private_data;
 	return simple_read_from_buffer (buf, len, ppos, cs->buf, cs->len);
 }
+*/
 
+/*
 int
 cogtra_ht_stats_release (struct inode *inode, struct file *file)
 {
 	kfree (file->private_data);
 	return 0;
 }
+*/
 
 static const struct file_operations cogtra_ht_stat_fops = {
 	.owner = THIS_MODULE,
 	.open = cogtra_ht_stats_open,
-	.read = cogtra_ht_stats_read,
-	.release = cogtra_ht_stats_release,
+	.read = cogtra_stats_read,
+	.release = cogtra_stats_release,
+	//.llseek = no_llseek,
+
 };
 
 void
 cogtra_ht_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir)
 {
-	struct cogtra_ht_sta_info *ci = priv_sta;
+	struct cogtra_ht_sta_priv *csp = priv_sta;
 
-	ci->dbg_stats = debugfs_create_file ("rc_stats", S_IRUGO, dir,
-			ci, &cogtra_ht_stat_fops); 
+	csp->dbg_stats = debugfs_create_file ("rc_stats", S_IRUGO, dir,
+			csp, &cogtra_ht_stat_fops); 
 }
 
 void
 cogtra_ht_remove_sta_debugfs(void *priv, void *priv_sta)
 {
-	struct cogtra_ht_sta_info *ci = priv_sta;
+	struct cogtra_ht_sta_priv *csp = priv_sta;
 	
-	debugfs_remove (ci->dbg_stats);
+	debugfs_remove (csp->dbg_stats);
 }

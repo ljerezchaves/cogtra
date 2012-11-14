@@ -49,6 +49,7 @@
 #include <linux/slab.h>
 #include <net/mac80211.h>
 #include "rate.h"
+#include "rc80211_cogtra.h"
 #include "rc80211_cogtra_ht.h"
 
 static inline int
@@ -182,11 +183,13 @@ rc80211_cogtra_ht_normal_generator (int mean, int stdev_times100)
 
 /* Converting mac80211 rate index into local array index */
 static inline int
-rix_to_ndx (struct cogtra_ht_sta_info *ci, int rix)
+rix_to_ndx (struct cogtra_ht_sta *ci, int rix)
 {
+	struct cogtra_rate *cr;
 	int i;
 	for (i = ci->n_rates - 1; i >= 0; i--)
-		if (ci->r[i].rix == rix)
+		cr = ci->r[i];
+		if (cr.rix == rix)
 			break;
 	return i;
 }
@@ -194,15 +197,16 @@ rix_to_ndx (struct cogtra_ht_sta_info *ci, int rix)
 
 /* Sort rates by bitrates. Is called once by cogtra_ht_rate_init */
 static void
-sort_bitrates (struct cogtra_ht_sta_info *ci, int n_rates)
+sort_bitrates (struct cogtra_ht_sta *ci, int n_rates)
 {
 	int i, j;
-	struct cogtra_ht_rate cr_key;
+	struct cogtra_rate cr_key;
 
 	/* Insertion sort */
-	for (j = 1; j < n_rates; j++) {
+	for (j = 1; j < n_rates; j++) {	
 		cr_key = ci->r[j];
 		i = j - 1;
+		
 		while ((i >= 0) && (ci->r[i].bitrate > cr_key.bitrate)) {
 			ci->r[i+1] = ci->r[i];
 			i--;
@@ -215,19 +219,19 @@ sort_bitrates (struct cogtra_ht_sta_info *ci, int n_rates)
 /* cogtra_ht_mrr_populate fill in the multirate retry chain in acordance with random
  * and best data rates*/
 static void
-cogtra_ht_mrr_populate (struct cogtra_ht_sta_info *ci)
+cogtra_ht_mrr_populate (struct cogtra_ht_sta *ci)
 {
 	struct chain_table *ct = ci->t;
 	memset (ct, 0, 4 * sizeof (*ct));
 	
 	/* Random COGTRA_HT rate */
-	ct[0].type = 0;	
-	ct[0].rix = ci->r[ci->random_rate_ndx].rix;
-	ct[0].bitrate = ci->r[ci->random_rate_ndx].bitrate;
+	ct[0].type = 0;
+	ct[0].rix = r[ci->random_rate_ndx].rix;
+	ct[0].bitrate = r[ci->random_rate_ndx].bitrate;
 	ct[0].count = 2U;
 
-	/* Best throughput */ 
-	ct[1].type = 1;	
+	/* Best throughput */
+	ct[1].type = 1;
 	ct[1].rix = ci->r[ci->max_tp_rate_ndx].rix;
 	ct[1].bitrate = ci->r[ci->max_tp_rate_ndx].bitrate;
 	ct[1].count = 2U;
@@ -250,8 +254,9 @@ cogtra_ht_mrr_populate (struct cogtra_ht_sta_info *ci)
  * expires. It sumarizes statistics information and use cogtra_ht core algorithm to
  * select the rate to be used during next interval. */
 static void
-cogtra_ht_update_stats (struct cogtra_ht_priv *cp, struct cogtra_ht_sta_info *ci)
+cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 {
+
 	u32 usecs;
 	u32 max_tp = 0, max_prob = 0;
 	unsigned int i, max_tp_ndx, max_prob_ndx;
@@ -267,7 +272,7 @@ cogtra_ht_update_stats (struct cogtra_ht_priv *cp, struct cogtra_ht_sta_info *ci
 
 	/* For each supported rate... */
 	for (i = 0; i < ci->n_rates; i++) {
-		struct cogtra_ht_rate *cr = &ci->r[i]; 
+		struct cogtra_rate *cr = &ci->r[i]; 
 
 		/* To avoid rounding issues, probabilities scale from 0 (0%)
 		 * to 1800 (100%) */
@@ -299,12 +304,11 @@ cogtra_ht_update_stats (struct cogtra_ht_priv *cp, struct cogtra_ht_sta_info *ci
 		cr->success = 0;
 		cr->attempts = 0;
 	}
-
 	new_thp = ci->r[ci->random_rate_ndx].avg_tp;
 
 	/* Look for the rate with highest throughput and probability */
 	for (i = 0; i < ci->n_rates; i++) {
-		struct cogtra_ht_rate *cr = &ci->r[i];
+		struct cogtra_rate *cr = &ci->r[i];
 		if (max_tp < cr->avg_tp) {
 			max_tp_ndx = i;
 			max_tp = cr->avg_tp;
@@ -334,8 +338,8 @@ cogtra_ht_update_stats (struct cogtra_ht_priv *cp, struct cogtra_ht_sta_info *ci
 	/* Adjust update_interval dependending on the random rate */
 	/* RANDOM < BEST || RANDOM.PROB < 10% */
 	if ((ci->r[ci->random_rate_ndx].perfect_tx_time >
-				ci->r[ci->max_tp_rate_ndx].perfect_tx_time) ||
-			(ci->r[ci->random_rate_ndx].avg_prob < 180)) 
+				ci->r[ci->random_rate_ndx].perfect_tx_time) ||
+			(ci->r[ci->random_rate_ndx]cr_new.avg_prob < 180)) 
 		ci->update_interval = COGTRA_HT_RECOVERY_INTERVAL;
 	else
 		ci->update_interval = COGTRA_HT_UPDATE_INTERVAL;
@@ -348,13 +352,17 @@ static void
 cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband, 
 		struct ieee80211_sta *sta, void *priv_sta, struct sk_buff *skb)
 {
-	struct cogtra_ht_sta_info *ci = priv_sta;
+	struct cogtra_ht_sta_priv *csp = priv_sta;
+	struct cogtra_ht_sta *ci = &csp->ht;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_tx_rate *ar = info->status.rates;
 	struct chain_table *ct = ci->t;
 	int i, ndx;
 	int success;
  
+	if(!csp->ht)
+		return mac80211_cogtra.tx_status(priv,sband, sta, &csp->legacy,skb);
+
  	/* Checking for a success in frame transmission */
 	success = !!(info->flags & IEEE80211_TX_STAT_ACK);
 
@@ -393,8 +401,9 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 {
 	struct sk_buff *skb = txrc->skb;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
-	struct cogtra_ht_sta_info *ci = priv_sta;
-	struct cogtra_ht_priv *cp = priv;
+	struct cogtra_ht_sta_priv *csp = priv_sta;
+	struct cogtra_ht_sta *ci = &csp->ht;
+	struct cogtra_priv *cp = priv;
 	struct ieee80211_tx_rate *ar = info->control.rates;
 	bool mrr;
 	int i;
@@ -403,6 +412,9 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	 * unsing lower rate */
 	if (rate_control_send_low (sta, priv_sta, txrc))
 		return;
+
+	if(!csp->is_ht)
+		return mac80211_cogtra.get_rate(priv, sta, &csp->legacy, txrc);
 
 	/* Check MRR hardware support */
 	mrr = cp->has_mrr && !txrc->rts && !txrc->bss_conf->use_cts_prot;
@@ -433,7 +445,7 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 /* calc_rate_durations estimates the tx time for a single data frame of 1200
  * bytes and for an ack frame of standard size for a specific rate */
 static void
-calc_rate_durations (struct ieee80211_local *local, struct cogtra_ht_rate *cr,
+calc_rate_durations (struct ieee80211_local *local, struct cogtra_rate *cr,
 		struct ieee80211_rate *rate)
 {
 	int erp = !!(rate->flags & IEEE80211_RATE_ERP_G);
@@ -448,14 +460,29 @@ calc_rate_durations (struct ieee80211_local *local, struct cogtra_ht_rate *cr,
 /* cogtra_ht_rate_init is called after cogtra_ht_alloc_sta to check and populate
  * information for supported rates */
 static void
-cogtra_ht_rate_init (void *priv, struct ieee80211_supported_band *sband,
-		struct ieee80211_sta *sta, void *priv_sta)
+cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
+		struct ieee80211_sta *sta, void *priv_sta,
+		enum nl80211_channel_type oper_chan_type)
 {
-	struct cogtra_ht_sta_info *ci = priv_sta;
-	struct cogtra_ht_priv *cp = priv;
+	struct cogtra_ht_sta_priv *csp = priv_sta;
+	struct cogtra_priv *cp = priv;
+	struct cogtra_ht_sta *ci = &csp->ht;
+	struct ieee80211_mcs_info *mcs = &sta->ht_cap.mcs;
 	struct ieee80211_local *local = hw_to_local(cp->hw);
 	struct ieee80211_rate *ctl_rate;
+	u16 sta_cap = sta->ht_cap.cap;
 	unsigned int i, n = 0;
+
+	/* fall back to the old cogtra for legacy stations */
+	if(!sta->ht_cap.ht_supported){
+		csp->is_ht = false;
+		memset(&csp->legacy, 0, sizeof(csp->legacy));
+		csp->legacy.r = csp->r;
+		csp->legacy.t = csp->t;
+		return mac80211_cogtra.rate_init(priv,sband,sta,&csp->legacy);
+	}
+	csp->is_ht = true;
+	memset(ci,0,sizeof(*ci));
 
 	/* Get the lowest index rate and calculate the duration of a ack tx */
 	ci->lowest_rix = rate_lowest_index (sband, sta);
@@ -463,7 +490,7 @@ cogtra_ht_rate_init (void *priv, struct ieee80211_supported_band *sband,
 
 	/* Populating information for each supported rate */
 	for (i = 0; i < sband->n_bitrates; i++) {
-		struct cogtra_ht_rate *cr = &ci->r[n];
+		struct cogtra_rate *cr = &ci->r[n];
 
 		/* Check rate support */
 		if (!rate_supported (sta, sband->band, i))
@@ -487,23 +514,39 @@ cogtra_ht_rate_init (void *priv, struct ieee80211_supported_band *sband,
 
 	ci->cur_stdev = COGTRA_HT_MAX_STDEV;
 	ci->n_rates = n;
+	
+	/*Antes no alloc_sta()*/
+	ci->update_interval = COGTRA_HT_UPDATE_INTERVAL;
 	ci->update_counter = 0UL;
 }
 
+cogtra_ht_rate_init (void *priv, struct ieee80211_supported_band *sband,
+		struct ieee80211_sta *sta, void *priv_sta)
+{
+	struct cogtra_priv *cp;
+	cogtra_ht_update_caps(priv, sband, sta, priv_sta, cp->hw->conf.channel_type);
+}
+cogtra_ht_rate_update (void *priv, struct ieee80211_supported_band *sband,
+		struct ieee80211_sta *sta, void *priv_sta,
+		u32 changed, enum nl80211_channel_type oper_chan_type)
+{
+	cogtra_ht_update_caps(priv, sband, sta, priv_sta, oper_chan_type);
+}
 
 /* cogtra_ht_alloc_sta is called every time a new station joins the networks */
 static void *
 cogtra_ht_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 {
 	struct ieee80211_supported_band *sband;
-	struct cogtra_ht_sta_info *ci;
-	struct cogtra_ht_priv *cp = priv;
+	struct cogtra_ht_sta_priv *csp;
+	struct cogtra_priv *cp = priv;
 	struct ieee80211_hw *hw = cp->hw;
 	int max_rates = 0;
 	int i;
 
-	ci = kzalloc (sizeof (struct cogtra_ht_sta_info), gfp);
-	if (!ci)
+	/*O minstrel_ht um mintrel_ht_sta */
+	csp = kzalloc (sizeof (struct cogtra_ht_sta_priv), gfp);
+	if (!csp)
 		return NULL;
 
 	/* Get the maximum number of rates based on available bands */
@@ -514,24 +557,26 @@ cogtra_ht_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 	}
 
 	/* Memory allocation for rates that can be used by this station */
-	ci->r = kzalloc (sizeof (struct cogtra_ht_rate) * (max_rates), gfp);
-	if (!ci->r) {
-		kfree(ci);
+	csp->r = kzalloc (sizeof (struct cogtra_rate) * (max_rates), gfp);
+	if (!csp->r) {
+		kfree(csp);
 		return NULL;
 	}
 
 	/* Memory allocation for mrr chain table */
-	ci->t = kzalloc (sizeof (struct chain_table) * 4, gfp);
-	if (!ci->t) {
-		kfree(ci->r);
-		kfree(ci);
+	csp->t = kzalloc (sizeof (struct chain_table) * 4, gfp);
+	if (!csp->t) {
+		kfree(csp->r);
+		kfree(csp);
 		return NULL;
 	}
 
+	/* Mudado para update_caps() 
 	ci->update_interval = COGTRA_HT_UPDATE_INTERVAL;
 	ci->update_counter = 0UL;
+	*/
 
-	return ci;
+	return csp;
 }
 
 
@@ -539,33 +584,19 @@ cogtra_ht_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 static void
 cogtra_ht_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 {
-	struct cogtra_ht_sta_info *ci = priv_sta;
+	struct cogtra_ht_sta_priv *csp = priv_sta;
 
-	kfree (ci->t);
-	kfree (ci->r);
-	kfree (ci);
+	kfree (csp->t);
+	kfree (csp->r);
+	kfree (csp);
 }
 
 
-/* cogtra_ht_alloc called once before turning on the wireless interface */
+/* chama o alloc do cogtra */
 static void *
 cogtra_ht_alloc (struct ieee80211_hw *hw, struct dentry *debugfsdir)
 {
-	struct cogtra_ht_priv *cp;
-
-	cp = kzalloc (sizeof (struct cogtra_ht_priv), GFP_ATOMIC);
-	if (!cp)
-		return NULL;
-
-	/* Default cogtra_ht values */
-	cp->ewma_level = COGTRA_HT_EWMA_LEVEL;
-
-	/* Max number of retries and MRR support */
-	cp->max_retry = hw->max_rate_tries > 0 ? hw->max_rate_tries : 7;
-	cp->has_mrr = hw->max_rates >= 4 ? true : false;
-
-	cp->hw = hw;
-	return cp;
+	return mac80211_cogtra.alloc(hw, debugfsdir);
 }
 
 
@@ -581,6 +612,7 @@ struct rate_control_ops mac80211_cogtra_ht = {
 	.tx_status = cogtra_ht_tx_status,
 	.get_rate = cogtra_ht_get_rate,
 	.rate_init = cogtra_ht_rate_init,
+	.rate_update = cogtra_ht_update_caps,
 	.alloc = cogtra_ht_alloc,
 	.free = cogtra_ht_free,
 	.alloc_sta = cogtra_ht_alloc_sta,
