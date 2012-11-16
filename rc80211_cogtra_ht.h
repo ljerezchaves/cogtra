@@ -21,75 +21,8 @@
 #define COGTRA_HT_RECOVERY_INTERVAL	20
 
 extern struct chain_table;
-/* Usa do cogtra */
-/*
-struct chain_table {
-	unsigned int type;
-	unsigned int count;
-	int bitrate;
-	int rix;
-	u32 att;
-	u32 suc;
-};
-*/
-
 extern struct chain_rate;
-/* Não vai precisar */ 
-/*
-struct cogtra_ht_rate {
-	int bitrate;
-	int rix;
 
-	// Devilery probability 
-	u32 cur_prob;					// prob for last interval (parts per thousand)
-	u32 avg_prob;					// avg prob (using ewma -- parts per thousand)
-
-	// Throughput information 
-	u32 cur_tp;						// thp for the last interval
-	u32 avg_tp;						// avg thp (using ewma)
-
-	// Transmission times for this rate 
-	unsigned int perfect_tx_time;	// tx time for 1200-byte data packet
-	unsigned int ack_time;			// tx time for ack packet
-
-	// Personalized retry count to avoid stall in the same packet 
-	unsigned int retry_count;
-
-	// Tx success and attempts counters 
-	u32 success;					// during last interval
-	u32 attempts;					// during last interval
-	u64 succ_hist;					// since ever 
-	u64 att_hist;					// since ever
-	u32 last_attempts;				// before last cogtra_ht_update_stats
-	u32 last_success;				// before last cogtra_ht_update_stats
-	
-	// Number of times this rate was used by cogtra_ht 
-	u32 times_called;
-};
-*/
-
-
-/* Futuramente será somente o cogtra_ht_sta*/
-/*
-struct cogtra_ht_sta_info {
-	unsigned int cur_stdev;			// current normal stdev
-	unsigned int max_tp_rate_ndx;		// index of rate with highest thp (current normal mean)
-	unsigned int max_prob_rate_ndx;		// index of rate with highest probability
-	unsigned int random_rate_ndx;		// random rate index (will be used in the next interval) 
-	unsigned int lowest_rix;		// lowest rate index 
-	unsigned int n_rates;			// number o supported rates 
-	unsigned long update_counter;		// last update time (time based) or pkt counter (pkt based)
-    	unsigned int update_interval; 		// time (or pkts) between cogtra_ht_update_stats
-	unsigned long up_stats_counter;		// update stats counter
-	
-	struct cogtra_ht_rate *r;				// rate pointer for each station
-	struct chain_table *t;			// chain table pointer for mrr
-
-#ifdef CONFIG_MAC80211_DEBUGFS
-	struct dentry *dbg_stats;		// debug file pointer 
-#endif
-};
-*/
 
 struct cogtra_ht_sta{
 	unsigned int cur_stdev;			// current normal stdev
@@ -124,35 +57,13 @@ struct cogtra_ht_sta_priv {
 
 };
 
-/* Não precisa, vai utilizar o cogtra_priv do cogtra */
-/*
-struct cogtra_ht_priv {
-	struct ieee80211_hw *hw;	  	// hardware properties 
-	bool has_mrr;				// mrr support
-	unsigned int max_retry;		  	// default max number o retries before frame discard
-	unsigned int ewma_level;	  	// ewma alpha for ammortize throughput.
-};
-*/
-
 /* Common functions */
 extern struct rate_control_ops mac80211_cogtra_ht;
 void cogtra_ht_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir);
 void cogtra_ht_remove_sta_debugfs (void *priv, void *priv_sta);
 
-/* Debugfs */ //Utiliza o antigo
-/*
-struct cogtra_ht_debugfs_info {
-	size_t len;
-	char buf[];
-};
-*/
 
 int cogtra_ht_stats_open (struct inode *inode, struct file *file);
 
-/* o read e release não precisa
-ssize_t cogtra_ht_stats_read (struct file *file, char __user *buf, size_t len, 
-		loff_t *ppos);
-int cogtra_ht_stats_release (struct inode *inode, struct file *file);
-*/
 #endif
 

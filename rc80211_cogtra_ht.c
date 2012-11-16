@@ -185,11 +185,9 @@ rc80211_cogtra_ht_normal_generator (int mean, int stdev_times100)
 static inline int
 rix_to_ndx (struct cogtra_ht_sta *ci, int rix)
 {
-	struct cogtra_rate *cr;
 	int i;
 	for (i = ci->n_rates - 1; i >= 0; i--)
-		cr = ci->r[i];
-		if (cr.rix == rix)
+		if (ci->r[i].rix == rix)
 			break;
 	return i;
 }
@@ -226,8 +224,8 @@ cogtra_ht_mrr_populate (struct cogtra_ht_sta *ci)
 	
 	/* Random COGTRA_HT rate */
 	ct[0].type = 0;
-	ct[0].rix = r[ci->random_rate_ndx].rix;
-	ct[0].bitrate = r[ci->random_rate_ndx].bitrate;
+	ct[0].rix = ci->r[ci->random_rate_ndx].rix;
+	ct[0].bitrate = ci->r[ci->random_rate_ndx].bitrate;
 	ct[0].count = 2U;
 
 	/* Best throughput */
@@ -338,8 +336,8 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 	/* Adjust update_interval dependending on the random rate */
 	/* RANDOM < BEST || RANDOM.PROB < 10% */
 	if ((ci->r[ci->random_rate_ndx].perfect_tx_time >
-				ci->r[ci->random_rate_ndx].perfect_tx_time) ||
-			(ci->r[ci->random_rate_ndx]cr_new.avg_prob < 180)) 
+				ci->r[ci->max_tp_rate_ndx].perfect_tx_time) ||
+			(ci->r[ci->random_rate_ndx].avg_prob < 180)) 
 		ci->update_interval = COGTRA_HT_RECOVERY_INTERVAL;
 	else
 		ci->update_interval = COGTRA_HT_UPDATE_INTERVAL;
