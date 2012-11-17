@@ -358,7 +358,7 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	int i, ndx;
 	int success;
  
-	if(!csp->ht)
+	if(!csp->is_ht)
 		return mac80211_cogtra.tx_status(priv,sband, sta, &csp->legacy,skb);
 
  	/* Checking for a success in frame transmission */
@@ -465,10 +465,10 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 	struct cogtra_ht_sta_priv *csp = priv_sta;
 	struct cogtra_priv *cp = priv;
 	struct cogtra_ht_sta *ci = &csp->ht;
-	struct ieee80211_mcs_info *mcs = &sta->ht_cap.mcs;
+	//struct ieee80211_mcs_info *mcs = &sta->ht_cap.mcs;
 	struct ieee80211_local *local = hw_to_local(cp->hw);
 	struct ieee80211_rate *ctl_rate;
-	u16 sta_cap = sta->ht_cap.cap;
+	//u16 sta_cap = sta->ht_cap.cap;
 	unsigned int i, n = 0;
 
 	/* fall back to the old cogtra for legacy stations */
@@ -518,12 +518,15 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 	ci->update_counter = 0UL;
 }
 
+static void
 cogtra_ht_rate_init (void *priv, struct ieee80211_supported_band *sband,
 		struct ieee80211_sta *sta, void *priv_sta)
 {
-	struct cogtra_priv *cp;
+	struct cogtra_priv *cp = priv;
 	cogtra_ht_update_caps(priv, sband, sta, priv_sta, cp->hw->conf.channel_type);
 }
+
+static void
 cogtra_ht_rate_update (void *priv, struct ieee80211_supported_band *sband,
 		struct ieee80211_sta *sta, void *priv_sta,
 		u32 changed, enum nl80211_channel_type oper_chan_type)
@@ -610,7 +613,7 @@ struct rate_control_ops mac80211_cogtra_ht = {
 	.tx_status = cogtra_ht_tx_status,
 	.get_rate = cogtra_ht_get_rate,
 	.rate_init = cogtra_ht_rate_init,
-	.rate_update = cogtra_ht_update_caps,
+	.rate_update = cogtra_ht_rate_update,
 	.alloc = cogtra_ht_alloc,
 	.free = cogtra_ht_free,
 	.alloc_sta = cogtra_ht_alloc_sta,

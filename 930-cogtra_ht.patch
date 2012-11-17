@@ -36,17 +36,22 @@
  mac80211-$(CONFIG_MAC80211_RC_ARF) += $(rc80211_arf-y)
 --- a/net/mac80211/main.c
 +++ b/net/mac80211/main.c
-@@ -1110,6 +1110,10 @@ static int __init ieee80211_init(void)
+@@ -1110,10 +1110,14 @@ static int __init ieee80211_init(void)
  	BUILD_BUG_ON(offsetof(struct ieee80211_tx_info, driver_data) +
  		     IEEE80211_TX_INFO_DRIVER_DATA_SIZE > sizeof(skb->cb));
  
+-	ret = rc80211_cogtra_init();
 +	ret = rc80211_cogtra_ht_init();
-+	if (ret)
-+		return ret;	
-+	
- 	ret = rc80211_cogtra_init();
  	if (ret)
  		return ret;
+ 
++	ret = rc80211_cogtra_init();
++	if (ret)
++		goto err_cogtra;
++
+ 	ret = rc80211_cora_init();
+ 	if (ret)
+ 		goto err_cora;
 @@ -1157,6 +1161,8 @@ static int __init ieee80211_init(void)
  	rc80211_cora_exit();
   err_cora:

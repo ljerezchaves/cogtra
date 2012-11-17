@@ -21,7 +21,7 @@
 #define COGTRA_HT_RECOVERY_INTERVAL	20
 
 extern struct chain_table;
-extern struct chain_rate;
+extern struct cogtra_rate;
 
 
 struct cogtra_ht_sta{
@@ -36,7 +36,7 @@ struct cogtra_ht_sta{
 	unsigned long up_stats_counter;		// update stats counter
 	
 	struct cogtra_rate *r;				// rate pointer for each station
-	struct cogtra_chain *t;				// chain table pointer for mrr
+	struct chain_table *t;				// chain table pointer for mrr
 
 #ifdef CONFIG_MAC80211_DEBUGFS
 	struct dentry *dbg_stats;		// debug file pointer 
@@ -52,7 +52,7 @@ struct cogtra_ht_sta_priv {
 	struct dentry *dbg_stats;		// debug file pointer 
 #endif
 	struct cogtra_rate *r;	
-	struct cogtra_chain *t;
+	struct chain_table *t;
 	bool is_ht;
 
 };

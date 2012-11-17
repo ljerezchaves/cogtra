@@ -66,6 +66,7 @@ cogtra_ht_stats_open (struct inode *inode, struct file *file)
 	struct cogtra_debugfs_info *cs;
 	unsigned int i, avg_tp, avg_prob, cur_tp, cur_prob;
 	char *p;
+	int ret;
 	
 	if (!csp->is_ht) {
 		inode->i_private = &csp->legacy;
@@ -88,7 +89,7 @@ cogtra_ht_stats_open (struct inode *inode, struct file *file)
 
 	/* Table lines */
 	for (i = 0; i < ci->n_rates; i++) {
-		struct cogtra_ht_rate *cr = &ci->r[i];
+		struct cogtra_rate *cr = &ci->r[i];
 
 		/* Print T for the rate with highest throughput (the mean of normal
 		 * curve), P for the rate with hisgest delivery probability and print *
