@@ -270,12 +270,12 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 
 	/* For each supported rate... */
 	for (i = 0; i < ci->n_rates; i++) {
-		struct cogtra_rate *cr = &ci->r[i]; 
+		struct cogtra_rate *cr = &ci->r[i];
 
 		/* To avoid rounding issues, probabilities scale from 0 (0%)
 		 * to 1800 (100%) */
 		if (cr->attempts) {
-			
+
 			usecs = cr->perfect_tx_time;
 			if (!usecs)
 				usecs = 1000000;
@@ -375,12 +375,12 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 		ndx = rix_to_ndx (ci, ar[i].idx);
 		if (ndx < 0)
 			continue;
-	
+
 		/* Increasing attempts counter */
 		ci->r[ndx].attempts += ar[i].count;
 		ci->update_counter += ar[i].count;
 		ct[i].att += ar[i].count;
-	
+
 		/* If it is the last used rate and resultesd in tx success, also
 		 * increse the success counter */
 		if ((i != IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) {
@@ -421,9 +421,9 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	if (ci->update_counter >= ci->update_interval)
 		cogtra_ht_update_stats (cp, ci);
 
-	/* Setting up tx rate information. 
+	/* Setting up tx rate information.
 	 * Be careful to convert ndx indexes into ieee80211_tx_rate indexes */
-	
+
 	if (!mrr) {
 		ar[0].idx = ci->r[ci->random_rate_ndx].rix;
 		ar[0].count = cp->max_retry;
@@ -512,7 +512,7 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 
 	ci->cur_stdev = COGTRA_HT_MAX_STDEV;
 	ci->n_rates = n;
-	
+
 	/*Antes no alloc_sta()*/
 	ci->update_interval = COGTRA_HT_UPDATE_INTERVAL;
 	ci->update_counter = 0UL;
