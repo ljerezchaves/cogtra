@@ -51,13 +51,13 @@
 #include "rate.h"
 #include "rc80211_cogtra.h"
 
-/* COGTRA Automatic Agressivness Adjustment (AAA) */
+/* COGTRA Agressivness Self-Adjustment (ASA) */
 static inline int
-cogtra_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp, 
+cogtra_asa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp, 
 		u32 curr_thp, unsigned int stdev)
 {
-	/* Check for more than 10% thp variation */
-	s32 delta = (s32)(last_thp / 10);
+	/* Check for more than ASA_DELTA thp variation */
+	s32 delta = (s32)(last_thp / COGTRA_ASA_DELTA);
 	s32 diff = (s32)(curr_thp - last_thp);
 
 	if (abs (diff) > delta)
@@ -98,6 +98,9 @@ rc80211_cogtra_normal_generator (int mean, int stdev_times100)
 	 * rounding. The following values were obtained from simulations. I'm still
 	 * not sure about this, but is working well... */
 	switch (stdev_times100) {
+	case 20:
+		round_fac = 40;
+		break;
 	case 25:
 		round_fac = 45;
 		break;
@@ -319,9 +322,11 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 	ci->max_prob_rate_ndx = max_prob_ndx;
 	ci->update_counter = 0UL;
 
+#ifdef COGTRA_USE_ASA
 	/* Adjusting stdev with CogTRA AAA */
-	ci->cur_stdev = cogtra_aaa (old_mean, ci->max_tp_rate_ndx,
+	ci->cur_stdev = cogtra_asa (old_mean, ci->max_tp_rate_ndx,
 			old_thp, new_thp, old_stdev);
+#endif
 
 	/* Get a new random rate for next interval (using a normal distribution) */
 	random = rc80211_cogtra_normal_generator ((int)ci->max_tp_rate_ndx,
@@ -332,6 +337,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 
 	cogtra_mrr_populate (ci);
 
+#ifdef COGTRA_USE_ISA
 	/* Adjust update_interval dependending on the random rate */
 	/* RANDOM < BEST || RANDOM.PROB < 10% */
 	if ((ci->r[ci->random_rate_ndx].perfect_tx_time >
@@ -340,6 +346,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 		ci->update_interval = COGTRA_RECOVERY_INTERVAL;
 	else
 		ci->update_interval = COGTRA_UPDATE_INTERVAL;
+#endif
 }
 
 
@@ -414,20 +421,24 @@ cogtra_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 
 	/* Setting up tx rate information. 
 	 * Be careful to convert ndx indexes into ieee80211_tx_rate indexes */
-	
-	if (!mrr) {
-		ar[0].idx = ci->r[ci->random_rate_ndx].rix;
-		ar[0].count = cp->max_retry;
-		ar[1].idx = -1;
-		ar[1].count = 0;
-		return;
-	}
 
-	/* MRR setup */
-	for (i = 0; i < 4; i++) {
-		ar[i].idx = ci->t[i].rix;
-		ar[i].count = ci->t[i].count;
+#ifdef COGTRA_USE_MRR
+	if (mrr) {
+		/* MRR setup */
+		for (i = 0; i < 4; i++) {
+			ar[i].idx = ci->t[i].rix;
+			ar[i].count = ci->t[i].count;
+		}
+		return;	
 	}
+#endif
+
+	/* Executed when no MRR support or COGTRA_USE_MRR disable */	
+	ar[0].idx = ci->r[ci->random_rate_ndx].rix;
+	ar[0].count = cp->max_retry;
+	ar[1].idx = -1;
+	ar[1].count = 0;
+	return;
 }
 
 

@@ -14,11 +14,26 @@
 #define __RC_COGTRA_H
 
 /* Cogtra custom code optimization */
-#define COGTRA_MAX_STDEV			150
+#define COGTRA_MAX_STDEV			20			// Use this for fixed stdev (without ASA)
 #define COGTRA_MIN_STDEV			40
 #define COGTRA_EWMA_LEVEL			30
 #define COGTRA_UPDATE_INTERVAL	    150
 #define COGTRA_RECOVERY_INTERVAL	20
+
+/* For experiments considering different delta values for ASA improvement 
+   Use the following table to define the correct constant value
+   Delta 5%  -> CGOTRA_ASA_DELTA 20
+   Delta 10% -> COGTRA_ASA_DELTA 10
+   Delta 20% -> CGOTRA_ASA_DELTA 5
+   Delta 25% -> CGOTRA_ASA_DELTA 4
+   Delta 50% -> CGOTRA_ASA_DELTA 2
+ */
+#define COGTRA_ASA_DELTA			10
+
+/* Use this flags to enable/disable ISA and ASA improvements */
+//#define COGTRA_USE_ASA				
+//#define COGTRA_USE_ISA
+#define COGTRA_USE_MRR
 
 struct chain_table {
 	unsigned int type;
