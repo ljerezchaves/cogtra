@@ -97,7 +97,9 @@ struct cogtra_sta_info {
 	struct chain_table *t;			// chain table pointer for mrr
 
 #ifdef CONFIG_MAC80211_DEBUGFS
-	struct dentry *dbg_stats;		// debug file pointer 
+	struct dentry *dbg_stats;		// debug file pointer
+	struct dentry *dbg_hist;		// debug new file pointer
+   	// Structure for 	
 #endif
 };
 
