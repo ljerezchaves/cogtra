@@ -31,8 +31,8 @@
 #define COGTRA_ASA_DELTA			10
 
 /* Use this flags to enable/disable ISA and ASA improvements */
-//#define COGTRA_USE_ASA				
-//#define COGTRA_USE_ISA
+#define COGTRA_USE_ASA				
+#define COGTRA_USE_ISA
 #define COGTRA_USE_MRR
 
 #define COGTRA_DEBUGFS_HIST_SIZE	500
