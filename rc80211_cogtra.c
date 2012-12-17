@@ -262,6 +262,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 	unsigned int old_stdev, old_mean;
 	u32 old_thp, new_thp;
 	int random = 0;
+	unsigned long j, diff = 0;
 
 	ci->up_stats_counter++;
 
@@ -346,6 +347,25 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 		ci->update_interval = COGTRA_RECOVERY_INTERVAL;
 	else
 		ci->update_interval = COGTRA_UPDATE_INTERVAL;
+#endif
+
+#ifdef CONFIG_MAC80211_DEBUGFS
+	/* History table information */
+	if (ci->dbg_idx < COGTRA_DEBUGFS_HIST_SIZE) {
+		struct cogtra_hist_info *t = &ci->hi[dbg_idx];
+		
+		j = jiffies;
+		diff = (long)j - (long)ci->last_time;
+		ci->last_time = j;
+		
+		t->rrate = ci->r[ci->random_rate_ndx].bitrate;
+		t->brate = ci->r[ci->max_tp_rate_ndx].bitrate;
+		t->prate = ci->r[ci->max_tp_rate_ndx].bitrate;
+		t->cur_stdev = ci->cur_stdev;
+		t->pktinterval = ci->update_interval;
+		t->msec = diff * 1000 / HZ;
+		dbg_idx++;
+	}
 #endif
 }
 

@@ -35,6 +35,8 @@
 //#define COGTRA_USE_ISA
 #define COGTRA_USE_MRR
 
+#define COGTRA_DEBUGFS_HIST_SIZE	500
+
 struct chain_table {
 	unsigned int type;
 	unsigned int count;
@@ -79,7 +81,6 @@ struct cogtra_rate {
 };
 
 
-
 /* cogtra_sta_info is allocated once per station. Information in this strcut
  * allows independed rate adaptation for each station */
 struct cogtra_sta_info {
@@ -97,9 +98,11 @@ struct cogtra_sta_info {
 	struct chain_table *t;			// chain table pointer for mrr
 
 #ifdef CONFIG_MAC80211_DEBUGFS
-	struct dentry *dbg_stats;		// debug file pointer
-	struct dentry *dbg_hist;		// debug new file pointer
-   	// Structure for 	
+	struct dentry *dbg_stats;		// debug rc_stats file pointer
+	struct dentry *dbg_hist;		// debug rc_history file pointer
+	struct cogtra_hist_info *hi;	// history table (for the first COGTRA_DEBUGFS_HIST_SIZE rate adaptations)
+	unsigned int dbg_idx;			// history table index
+	unsigned long last_time;		// jiffies for the last rate adaptation
 #endif
 };
 
@@ -124,6 +127,17 @@ struct cogtra_debugfs_info {
 	size_t len;
 	char buf[];
 };
+
+/* Debugfs */
+struct cogtra_hist_info {
+	int rrate;
+	int brate;
+	int prate;
+	unsigned int currstdev;
+	unsigned int pktinterval;
+	int msec;
+};
+
 
 int cogtra_stats_open (struct inode *inode, struct file *file);
 ssize_t cogtra_stats_read (struct file *file, char __user *buf, size_t len, 

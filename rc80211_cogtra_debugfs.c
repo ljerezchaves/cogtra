@@ -152,87 +152,41 @@ int
 cogtra_hist_open (struct inode *inode, struct file *file)
 {
 	struct cogtra_sta_info *ci = inode->i_private;
-	struct cogtra_debugfs_info *cs;
-	unsigned int i, avg_tp, avg_prob, cur_tp, cur_prob;
+	struct cogtra_debugfs_info *ch;
+	unsigned int i;
+	unsigned int time = 0;
 	char *p;
 
-	cs = kmalloc (sizeof (*cs) + 4096, GFP_KERNEL);
-	if (!cs)
+	ch = kmalloc (sizeof (*ch) 
+			    + sizeof (struct cogtra_hist_info) * COGTRA_DEBUGFS_HIST_SIZE 
+				+ 1024, GFP_KERNEL);
+	if (!ch)
 		return -ENOMEM;
 
-	file->private_data = cs;
-	p = cs->buf;
+	file->private_data = ch;
+	p = ch->buf;
 
 	/* Table header */
-	p += sprintf(p, "\n Rate Table:\n");
-	p += sprintf(p, "    | rate | avg_thp | avg_pro | cur_thp | cur_pro | "
-			"succ ( atte ) | success | attempts | #used \n");
+	p += sprintf(p, "\n History information for the %u first rate adaptations:\n", ci->dbg_idx);
+	p += sprintf(p, " | Time (ms) | Rrate | Brate | Prate | stdev | pktin |\n");
 
 	/* Table lines */
-	for (i = 0; i < ci->n_rates; i++) {
-		struct cogtra_rate *cr = &ci->r[i];
+	for (i = 0; i < ci->dbg_hist; i++) {
+		struct cogtra_hist_info	*t = &ci->hi[i];
 
-		/* Print T for the rate with highest throughput (the mean of normal
-		 * curve), P for the rate with hisgest delivery probability and print *
-		 * for the rate been used now */
-		*(p++) = (i == ci->random_rate_ndx)		? '*' : ' ';
-		*(p++) = (i == ci->max_tp_rate_ndx) 	? 'T' : ' ';   
-		*(p++) = (i == ci->max_prob_rate_ndx) 	? 'P' : ' ';   
-
-		p += sprintf(p, " |%3u%s ", cr->bitrate / 2,
-				(cr->bitrate & 1 ? ".5" : "  "));
-
-		/* Converting the internal thp and prob format */
-		avg_tp = cr->avg_tp / ((1800 << 10) / 96);
-		cur_tp = cr->cur_tp / ((1800 << 10) / 96);
-		avg_prob = cr->avg_prob;
-		cur_prob = cr->cur_prob;
-
-		p += sprintf (
-				p, 
-				"| %5u.%1u | %7u | %5u.%1u | %7u "
-				"| %4u ( %4u ) | %7llu | %8llu | %5u\n",
-				avg_tp / 10, avg_tp % 10,
-				avg_prob / 18,
-				cur_tp / 10, cur_tp % 10,
-				cur_prob / 18,
-				cr->last_success, cr->last_attempts,
-				(unsigned long long) cr->succ_hist,
-				(unsigned long long) cr->att_hist,
-				cr->times_called
+		time += t->msec;	
+		p += sprintf(p, " | %9u | %3u%s | %3u%s | %3u%s | %2u.%2u | %5u |\n", 
+				time,
+				t->rrate / 2, (t->rrate & 1 ? ".5" : "  "),
+				t->brate / 2, (t->brate & 1 ? ".5" : "  "),
+				t->prate / 2, (t->prate & 1 ? ".5" : "  "),
+				t->currstdev / 100, t->currstdev % 100,
+				t->pktinterval,
 			);
 	}
 
-	/* Chain table  */
-	p += sprintf(p, "\n MRR Chain Table:\n");
-	p += sprintf(p, " type |  rate | count | success | attempts \n");
-
-	for (i = 0; i < 4; i++) {
-		struct chain_table *ct = &ci->t[i];
-
-		p += sprintf (
-			p, 
-			" %s | %3u%s | %5u | %7llu | %8llu\n",
-			ct->type == 0 ? "rand": ct->type == 1 ? "best" : ct->type == 2 ? "prob" : "lowr", 
-			ct->bitrate / 2, (ct->bitrate & 1 ? ".5" : "  "),
-			ct->count,
-			(unsigned long long) ct->suc,
-			(unsigned long long) ct->att
-		);
-	}
-
 	/* Table footer */
-	p += sprintf(p, "\n Cognitive Transmission Rate Adaptation (CogTRA):\n"
-			"   HISTORY FILE :P\n"
-			"   Number of rates:      %u\n"
-			"   Current pkt interval: %u\n"
-			"   Current Normal Mean:  %u\n"
-		   	"   Current Normal Stdev: %u.%2u\n",
-			ci->n_rates,
-			ci->update_interval,
-			ci->max_tp_rate_ndx,
-			ci->cur_stdev / 100, ci->cur_stdev % 100
-		);
+	p += sprintf(p, "\n Cognitive Transmission Rate Adaptation (CogTRA)");
 
 	cs->len = p - cs->buf;
 	return 0;
@@ -292,7 +246,14 @@ cogtra_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir)
 	ci->dbg_stats = debugfs_create_file ("rc_stats", S_IRUGO, dir,
 			ci, &cogtra_stat_fops); 
 	ci->dbg_hist = debugfs_create_file ("rc_history", S_IRUGO, dir,
-			ci, &cogtra_hist_fops); 
+			ci, &cogtra_hist_fops);
+	
+	// Allocating memory for history table
+   	ci->dbg_idx = 0;
+	ci->last_time = jiffies;
+	ci->hi = kzalloc (sizeof (struct cogtra_hist_info) * COGTRA_DEBUGFS_HIST_SIZE, gfp);
+	if (!ci->hi)
+		return ENOMEM;
 }
 
 void
