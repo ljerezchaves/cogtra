@@ -560,8 +560,19 @@ cogtra_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 		return NULL;
 	}
 
+#ifdef CONFIG_MAC80211_DEBUGFS
+   	ci->hi = kzalloc (sizeof (struct cogtra_hist_info) * COGTRA_DEBUGFS_HIST_SIZE, gfp);
+	if (!ci->hi) }
+		kfree (ci->t);
+		kfree (ci->r);
+		kfree (ci);
+		return NULL;
+	}
+#endif
+
 	ci->update_interval = COGTRA_UPDATE_INTERVAL;
 	ci->update_counter = 0UL;
+	ci->last_time = jiffies;
 
 	return ci;
 }

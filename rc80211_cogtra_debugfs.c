@@ -247,13 +247,6 @@ cogtra_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir)
 			ci, &cogtra_stat_fops); 
 	ci->dbg_hist = debugfs_create_file ("rc_history", S_IRUGO, dir,
 			ci, &cogtra_hist_fops);
-	
-	// Allocating memory for history table
-   	ci->dbg_idx = 0;
-	ci->last_time = jiffies;
-	ci->hi = kzalloc (sizeof (struct cogtra_hist_info) * COGTRA_DEBUGFS_HIST_SIZE, gfp);
-	if (!ci->hi)
-		return ENOMEM;
 }
 
 void

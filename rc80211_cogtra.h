@@ -97,12 +97,13 @@ struct cogtra_sta_info {
 	struct cogtra_rate *r;			// rate pointer for each station
 	struct chain_table *t;			// chain table pointer for mrr
 
-#ifdef CONFIG_MAC80211_DEBUGFS
-	struct dentry *dbg_stats;		// debug rc_stats file pointer
-	struct dentry *dbg_hist;		// debug rc_history file pointer
 	struct cogtra_hist_info *hi;	// history table (for the first COGTRA_DEBUGFS_HIST_SIZE rate adaptations)
 	unsigned int dbg_idx;			// history table index
 	unsigned long last_time;		// jiffies for the last rate adaptation
+
+#ifdef CONFIG_MAC80211_DEBUGFS
+	struct dentry *dbg_stats;		// debug rc_stats file pointer
+	struct dentry *dbg_hist;		// debug rc_history file pointer
 #endif
 };
 
