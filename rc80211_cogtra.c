@@ -352,7 +352,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 #ifdef CONFIG_MAC80211_DEBUGFS
 	/* History table information */
 	if (ci->dbg_idx < COGTRA_DEBUGFS_HIST_SIZE) {
-		struct cogtra_hist_info *t = &ci->hi[dbg_idx];
+		struct cogtra_hist_info *t = &ci->hi[ci->dbg_idx];
 		
 		j = jiffies;
 		diff = (long)j - (long)ci->last_time;
@@ -361,7 +361,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 		t->rrate = ci->r[ci->random_rate_ndx].bitrate;
 		t->brate = ci->r[ci->max_tp_rate_ndx].bitrate;
 		t->prate = ci->r[ci->max_tp_rate_ndx].bitrate;
-		t->cur_stdev = ci->cur_stdev;
+		t->currstdev = ci->cur_stdev;
 		t->pktinterval = ci->update_interval;
 		t->msec = diff * 1000 / HZ;
 		dbg_idx++;
@@ -562,7 +562,7 @@ cogtra_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 
 #ifdef CONFIG_MAC80211_DEBUGFS
    	ci->hi = kzalloc (sizeof (struct cogtra_hist_info) * COGTRA_DEBUGFS_HIST_SIZE, gfp);
-	if (!ci->hi) }
+	if (!ci->hi) {
 		kfree (ci->t);
 		kfree (ci->r);
 		kfree (ci);
