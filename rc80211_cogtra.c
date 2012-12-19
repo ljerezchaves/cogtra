@@ -353,21 +353,27 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci,
 #ifdef CONFIG_MAC80211_DEBUGFS
 	/* History table information */
 	if (ci->dbg_idx < COGTRA_DEBUGFS_HIST_SIZE) {
-		struct cogtra_hist_info *t = &ci->hi[ci->dbg_idx];
+		struct chain_table *ct = ci->t;
+		struct cogtra_hist_info *ht = &ci->hi[ci->dbg_idx];
 		struct sta_info *si = container_of (sta, struct sta_info, sta);
-		struct ewma *avg = si->avg_signal;
+		struct ewma *avg = &si->avg_signal;
 
 		j = jiffies;
 		diff = (long)j - (long)ci->last_time;
 		ci->last_time = j;
 		
-		t->rrate = ci->r[ci->random_rate_ndx].bitrate;
-		t->brate = ci->r[ci->max_tp_rate_ndx].bitrate;
-		t->prate = ci->r[ci->max_tp_rate_ndx].bitrate;
-		t->currstdev = ci->cur_stdev;
-		t->pktinterval = ci->update_interval;
-		t->avgsignal = avg->ewma_get ();
-		t->msec = diff * 1000 / HZ;
+		ht->rrate = ci->r[ci->random_rate_ndx].bitrate;
+		ht->brate = ci->r[ci->max_tp_rate_ndx].bitrate;
+		ht->prate = ci->r[ci->max_tp_rate_ndx].bitrate;
+
+		ht->rpercent = (unsigned int)((ct[0].count*100)/ci->update_interval);
+		ht->bpercent = (unsigned int)((ct[1].count*100)/ci->update_interval);
+		ht->ppercent = (unsigned int)((ct[2].count*100)/ci->update_interval);
+		ht->lpercent = (unsigned int)((ct[3].count*100)/ci->update_interval);
+		ht->currstdev = ci->cur_stdev;
+		ht->pktinterval = ci->update_interval;
+		ht->avgsignal = (int)avg->ewma_get ();
+		ht->msec = diff * 1000 / HZ;
 		ci->dbg_idx++;
 	}
 #endif

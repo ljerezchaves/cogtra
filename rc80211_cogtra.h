@@ -14,7 +14,7 @@
 #define __RC_COGTRA_H
 
 /* Cogtra custom code optimization */
-#define COGTRA_MAX_STDEV			20			// Use this for fixed stdev (without ASA)
+#define COGTRA_MAX_STDEV			150			// Use this for fixed stdev (without ASA)
 #define COGTRA_MIN_STDEV			40
 #define COGTRA_EWMA_LEVEL			30
 #define COGTRA_UPDATE_INTERVAL	    150
@@ -130,13 +130,20 @@ struct cogtra_debugfs_info {
 
 /* Debugfs */
 struct cogtra_hist_info {
+	int msec;
+	
 	int rrate;
 	int brate;
 	int prate;
+	
+	unsigned int rpercent;
+	unsigned int bpercent;
+	unsigned int ppercent;
+	unsigned int lpercent;
+	
 	unsigned int currstdev;
 	unsigned int pktinterval;
-	unsigned long avgsignal;
-	int msec;
+	int avgsignal;
 };
 
 

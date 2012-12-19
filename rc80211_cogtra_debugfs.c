@@ -170,21 +170,22 @@ cogtra_hist_open (struct inode *inode, struct file *file)
 	p += sprintf(p, "Cognitive Transmission Rate Adaptation (CogTRA)\n");
 	p += sprintf(p, "History Information Table\n"); 
 	p += sprintf(p, "Rate adaptations: %u\n\n", ci->dbg_idx);
-	p += sprintf(p, "| Time (ms) | Rrate | Brate | Prate | stdev | pktin | signal |\n");
+	p += sprintf(p, "| Time (ms) | Rrate | Brate | Prate | stdev | pktin | signal |     MRR usage      |\n");
 
 	/* Table lines */
 	for (i = 0; i < ci->dbg_idx; i++) {
 		struct cogtra_hist_info	*t = &ci->hi[i];
 
 		time += t->msec;	
-		p += sprintf(p, "| %9u | %3u%s | %3u%s | %3u%s | %2u.%2u | %5u | %6lu |\n", 
+		p += sprintf(p, "| %9u | %3u%s | %3u%s | %3u%s | %2u.%2u | %5u | %6d | %3u - %2u - %2u - %1u |\n", 
 				time,
 				t->rrate / 2, (t->rrate & 1 ? ".5" : "  "),
 				t->brate / 2, (t->brate & 1 ? ".5" : "  "),
 				t->prate / 2, (t->prate & 1 ? ".5" : "  "),
 				t->currstdev / 100, t->currstdev % 100,
 				t->pktinterval,
-				t->avgsignal
+				t->avgsignal,
+				t->rpercent, t->bpercent, t->ppercent, t->lpercent
 			);
 	}
 
