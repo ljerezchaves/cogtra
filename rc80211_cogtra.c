@@ -365,7 +365,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci,
 		t->prate = ci->r[ci->max_tp_rate_ndx].bitrate;
 		t->currstdev = ci->cur_stdev;
 		t->pktinterval = ci->update_interval;
-		t->lastsignal = si->last_signal
+		t->lastsignal = si->last_signal;
 		t->msec = diff * 1000 / HZ;
 		ci->dbg_idx++;
 	}
