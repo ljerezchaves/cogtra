@@ -93,15 +93,14 @@ struct cogtra_sta_info {
 	unsigned long update_counter;	// last update time (time based) or pkt counter (pkt based)
     unsigned int update_interval; 	// time (or pkts) between cogtra_update_stats
 	unsigned long up_stats_counter;	// update stats counter
+	unsigned long last_time;		// jiffies for the last rate adaptation
 	
 	struct cogtra_rate *r;			// rate pointer for each station
 	struct chain_table *t;			// chain table pointer for mrr
 
+#ifdef CONFIG_MAC80211_DEBUGFS
 	struct cogtra_hist_info *hi;	// history table (for the first COGTRA_DEBUGFS_HIST_SIZE rate adaptations)
 	unsigned int dbg_idx;			// history table index
-	unsigned long last_time;		// jiffies for the last rate adaptation
-
-#ifdef CONFIG_MAC80211_DEBUGFS
 	struct dentry *dbg_stats;		// debug rc_stats file pointer
 	struct dentry *dbg_hist;		// debug rc_history file pointer
 #endif
@@ -136,6 +135,7 @@ struct cogtra_hist_info {
 	int prate;
 	unsigned int currstdev;
 	unsigned int pktinterval;
+	int lastsignal;
 	int msec;
 };
 

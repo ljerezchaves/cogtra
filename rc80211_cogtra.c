@@ -254,7 +254,8 @@ cogtra_mrr_populate (struct cogtra_sta_info *ci)
  * expires. It sumarizes statistics information and use cogtra core algorithm to
  * select the rate to be used during next interval. */
 static void
-cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
+cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci, 
+		struct ieee80211_sta *sta)
 {
 	u32 usecs;
 	u32 max_tp = 0, max_prob = 0;
@@ -353,7 +354,8 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 	/* History table information */
 	if (ci->dbg_idx < COGTRA_DEBUGFS_HIST_SIZE) {
 		struct cogtra_hist_info *t = &ci->hi[ci->dbg_idx];
-		
+		struct sta_info *si = container_of (sta, struct sta_info, sta);
+
 		j = jiffies;
 		diff = (long)j - (long)ci->last_time;
 		ci->last_time = j;
@@ -363,8 +365,9 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 		t->prate = ci->r[ci->max_tp_rate_ndx].bitrate;
 		t->currstdev = ci->cur_stdev;
 		t->pktinterval = ci->update_interval;
+		t->lastsignal = si->last_signal
 		t->msec = diff * 1000 / HZ;
-		dbg_idx++;
+		ci->dbg_idx++;
 	}
 #endif
 }
@@ -437,7 +440,7 @@ cogtra_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 
 	/* Check the need of an update_stats based on update_interval */
 	if (ci->update_counter >= ci->update_interval)
-		cogtra_update_stats (cp, ci);
+		cogtra_update_stats (cp, ci, sta);
 
 	/* Setting up tx rate information. 
 	 * Be careful to convert ndx indexes into ieee80211_tx_rate indexes */
