@@ -135,7 +135,7 @@ struct cogtra_hist_info {
 	int prate;
 	unsigned int currstdev;
 	unsigned int pktinterval;
-	int lastsignal;
+	unsigned long avgsignal;
 	int msec;
 };
 

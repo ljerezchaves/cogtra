@@ -177,14 +177,14 @@ cogtra_hist_open (struct inode *inode, struct file *file)
 		struct cogtra_hist_info	*t = &ci->hi[i];
 
 		time += t->msec;	
-		p += sprintf(p, "| %9u | %3u%s | %3u%s | %3u%s | %2u.%2u | %5u | %6d |\n", 
+		p += sprintf(p, "| %9u | %3u%s | %3u%s | %3u%s | %2u.%2u | %5u | %6lu |\n", 
 				time,
 				t->rrate / 2, (t->rrate & 1 ? ".5" : "  "),
 				t->brate / 2, (t->brate & 1 ? ".5" : "  "),
 				t->prate / 2, (t->prate & 1 ? ".5" : "  "),
 				t->currstdev / 100, t->currstdev % 100,
 				t->pktinterval,
-				t->lastsignal
+				t->avgsignal
 			);
 	}
 
