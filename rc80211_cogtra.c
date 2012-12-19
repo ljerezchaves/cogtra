@@ -372,7 +372,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci,
 		ht->lpercent = (unsigned int)((ct[3].count*100)/ci->update_interval);
 		ht->currstdev = ci->cur_stdev;
 		ht->pktinterval = ci->update_interval;
-		ht->avgsignal = (int)avg->ewma_get ();
+		ht->avgsignal = (int)ewma_read (avg);
 		ht->msec = diff * 1000 / HZ;
 		ci->dbg_idx++;
 	}
