@@ -366,10 +366,10 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci,
 		ht->brate = ci->r[ci->max_tp_rate_ndx].bitrate;
 		ht->prate = ci->r[ci->max_tp_rate_ndx].bitrate;
 
-		ht->rpercent = (unsigned int)((ct[0].count*100)/ci->update_interval);
-		ht->bpercent = (unsigned int)((ct[1].count*100)/ci->update_interval);
-		ht->ppercent = (unsigned int)((ct[2].count*100)/ci->update_interval);
-		ht->lpercent = (unsigned int)((ct[3].count*100)/ci->update_interval);
+		ht->rpercent = (unsigned int)((ct[0].suc*100)/ci->update_interval);
+		ht->bpercent = (unsigned int)((ct[1].suc*100)/ci->update_interval);
+		ht->ppercent = (unsigned int)((ct[2].suc*100)/ci->update_interval);
+		ht->lpercent = (unsigned int)((ct[3].suc*100)/ci->update_interval);
 		ht->currstdev = ci->cur_stdev;
 		ht->pktinterval = ci->update_interval;
 		ht->avgsignal = (int)ewma_read (avg);
