@@ -169,23 +169,26 @@ cogtra_hist_open (struct inode *inode, struct file *file)
 	/* Table header */
 	p += sprintf(p, "Cognitive Transmission Rate Adaptation (CogTRA)\n");
 	p += sprintf(p, "History Information Table\n"); 
-	p += sprintf(p, "Rate adaptations: %u\n\n", ci->dbg_idx);
-	p += sprintf(p, "| Time (ms) | Rrate | Brate | Prate | stdev | pktin | signal |     MRR usage      |\n");
+	p += sprintf(p, "Rate adaptations: %u (max of %u)\n\n", ci->dbg_idx, COGTRA_DEBUGFS_HIST_SIZE);
+	p += sprintf(p, "Idx | Start time | Duration | AvgSig | Random | BestThp | BestPro | Stdev | Pktint | AvgSig | MRR usage\n");
 
 	/* Table lines */
-	for (i = 0; i < ci->dbg_idx; i++) {
+	for (i = 0; i < ci->dbg_idx && i < COGTRA_DEBUGFS_HIST_SIZE; i++) {
 		struct cogtra_hist_info	*t = &ci->hi[i];
 
 		time += t->msec;	
-		p += sprintf(p, "| %9u | %3u%s | %3u%s | %3u%s | %2u.%2u | %5u | %6d | %3u - %2u - %2u - %1u |\n", 
-				time,
-				t->rrate / 2, (t->rrate & 1 ? ".5" : "  "),
-				t->brate / 2, (t->brate & 1 ? ".5" : "  "),
-				t->prate / 2, (t->prate & 1 ? ".5" : "  "),
+		p += sprintf(p, "%3u | %10d | %8d | %6d | %4u%s | %5u%s | %5u%s | %2u.%2u | %6u | %3d,%3d,%3d,%3d,%3d\n", 
+				i,
+				t->start_ms,
+				t->duration_ms,
+				t->avg_signal,
+				t->rand_rate / 2, (t->rand_rate & 1 ? ".5" : "  "),
+				t->best_rate / 2, (t->best_rate & 1 ? ".5" : "  "),
+				t->prob_rate / 2, (t->prob_rate & 1 ? ".5" : "  "),
 				t->currstdev / 100, t->currstdev % 100,
 				t->pktinterval,
-				t->avgsignal,
-				t->rpercent, t->bpercent, t->ppercent, t->lpercent
+				t->rand_pct, t->best_pct, t->prob_pct, t->lowr_pct, 
+				(100 - t->rand_pct - t->best_pct - t->prob_pct - t->lowr_pct)
 			);
 	}
 

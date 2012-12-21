@@ -324,6 +324,30 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci,
 	ci->max_prob_rate_ndx = max_prob_ndx;
 	ci->update_counter = 0UL;
 
+#ifdef CONFIG_MAC80211_DEBUGFS
+	/* Remaining history information for the last cycle */
+	if (ci->dbg_idx < COGTRA_DEBUGFS_HIST_SIZE) {
+		struct chain_table *ct = ci->t;
+		struct cogtra_hist_info *ht = &ci->hi[ci->dbg_idx];
+		struct sta_info *si = container_of (sta, struct sta_info, sta);
+		struct ewma *avg = &si->avg_signal;
+
+		j = jiffies;
+		diff = (long)j - (long)ci->last_time;
+		ci->last_time = j;
+
+		ht->duration_ms = (int)(diff * 1000 / HZ);
+		ht->avg_signal = (int)ewma_read (avg);
+		
+		ht->rand_pct =(int)((100*ct[0].suc) / ci->update_interval); 
+		ht->best_pct =(int)((100*ct[0].suc) / ci->update_interval); 
+		ht->prob_pct =(int)((100*ct[0].suc) / ci->update_interval); 
+		ht->lowr_pct =(int)((100*ct[0].suc) / ci->update_interval); 
+		
+		ci->dbg_idx++;
+	}
+#endif
+
 #ifdef COGTRA_USE_ASA
 	/* Adjusting stdev with CogTRA AAA */
 	ci->cur_stdev = cogtra_asa (old_mean, ci->max_tp_rate_ndx,
@@ -351,30 +375,18 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci,
 #endif
 
 #ifdef CONFIG_MAC80211_DEBUGFS
-	/* History table information */
+	/* History table information for the next cycle */
 	if (ci->dbg_idx < COGTRA_DEBUGFS_HIST_SIZE) {
-		struct chain_table *ct = ci->t;
 		struct cogtra_hist_info *ht = &ci->hi[ci->dbg_idx];
-		struct sta_info *si = container_of (sta, struct sta_info, sta);
-		struct ewma *avg = &si->avg_signal;
 
-		j = jiffies;
-		diff = (long)j - (long)ci->last_time;
-		ci->last_time = j;
-		
+		diff = (long)j - (long)ci->first_time;
+		ht->start_ms = (int)(diff * 1000 / HZ);
+			
 		ht->rrate = ci->r[ci->random_rate_ndx].bitrate;
 		ht->brate = ci->r[ci->max_tp_rate_ndx].bitrate;
 		ht->prate = ci->r[ci->max_tp_rate_ndx].bitrate;
-
-		ht->rpercent = (unsigned int)((ct[0].suc*100)/ci->update_interval);
-		ht->bpercent = (unsigned int)((ct[1].suc*100)/ci->update_interval);
-		ht->ppercent = (unsigned int)((ct[2].suc*100)/ci->update_interval);
-		ht->lpercent = (unsigned int)((ct[3].suc*100)/ci->update_interval);
-		ht->currstdev = ci->cur_stdev;
-		ht->pktinterval = ci->update_interval;
-		ht->avgsignal = (int)ewma_read (avg);
-		ht->msec = diff * 1000 / HZ;
-		ci->dbg_idx++;
+		ht->cur+stdev = ci->cur_stdev;
+		ht->pkt_interval = ci->update_interval;
 	}
 #endif
 }
@@ -527,9 +539,20 @@ cogtra_rate_init (void *priv, struct ieee80211_supported_band *sband,
 	for (i = n; i < sband->n_bitrates; i++)
 		ci->r[i].rix = -1;
 
+#ifdef CONFIG_MAC80211_DEBUGFS
+	/* Filling information for this first rate adaptation */
+	ci->hi[0].start_ms = 0;
+	ci->hi[0].rand_rate = ci->hi[0].best_rate = ci->hi[0].prob_rate = ci->r[0].bitrate;
+	ci->hi[0].cur_stdev = COGTRA_MAX_STDEV;
+	ci->hi[0].pkt_interval = COGTRA_UPDATE_INTERVAL;
+	ci->dbg_idx = 0;
+#endif
+
+	ci->update_interval = COGTRA_UPDATE_INTERVAL;	
 	ci->cur_stdev = COGTRA_MAX_STDEV;
 	ci->n_rates = n;
 	ci->update_counter = 0UL;
+	ci->fist_time = ci->last_time = jiffies;
 }
 
 
@@ -571,6 +594,7 @@ cogtra_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 	}
 
 #ifdef CONFIG_MAC80211_DEBUGFS
+	/* If in debugfs mode, memory allocation for history table */
    	ci->hi = kzalloc (sizeof (struct cogtra_hist_info) * COGTRA_DEBUGFS_HIST_SIZE, gfp);
 	if (!ci->hi) {
 		kfree (ci->t);
@@ -579,10 +603,6 @@ cogtra_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 		return NULL;
 	}
 #endif
-
-	ci->update_interval = COGTRA_UPDATE_INTERVAL;
-	ci->update_counter = 0UL;
-	ci->last_time = jiffies;
 
 	return ci;
 }
