@@ -154,7 +154,6 @@ cogtra_hist_open (struct inode *inode, struct file *file)
 	struct cogtra_sta_info *ci = inode->i_private;
 	struct cogtra_debugfs_info *ch;
 	unsigned int i;
-	unsigned int time = 0;
 	char *p;
 
 	ch = kmalloc (sizeof (*ch) 
@@ -176,7 +175,6 @@ cogtra_hist_open (struct inode *inode, struct file *file)
 	for (i = 0; i < ci->dbg_idx && i < COGTRA_DEBUGFS_HIST_SIZE; i++) {
 		struct cogtra_hist_info	*t = &ci->hi[i];
 
-		time += t->msec;	
 		p += sprintf(p, "%3u | %10d | %8d | %6d | %4u%s | %5u%s | %5u%s | %2u.%2u | %6u | %3d,%3d,%3d,%3d,%3d\n", 
 				i,
 				t->start_ms,
@@ -185,8 +183,8 @@ cogtra_hist_open (struct inode *inode, struct file *file)
 				t->rand_rate / 2, (t->rand_rate & 1 ? ".5" : "  "),
 				t->best_rate / 2, (t->best_rate & 1 ? ".5" : "  "),
 				t->prob_rate / 2, (t->prob_rate & 1 ? ".5" : "  "),
-				t->currstdev / 100, t->currstdev % 100,
-				t->pktinterval,
+				t->cur_stdev / 100, t->cur_stdev % 100,
+				t->pkt_interval,
 				t->rand_pct, t->best_pct, t->prob_pct, t->lowr_pct, 
 				(100 - t->rand_pct - t->best_pct - t->prob_pct - t->lowr_pct)
 			);
