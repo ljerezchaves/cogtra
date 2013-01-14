@@ -170,7 +170,7 @@ cogtra_hist_open (struct inode *inode, struct file *file)
 	p += sprintf(p, "Cognitive Transmission Rate Adaptation (CogTRA)\n");
 	p += sprintf(p, "History Information Table\n"); 
 	p += sprintf(p, "Rate adaptations: %u (max of %u)\n\n", ci->dbg_idx, COGTRA_DEBUGFS_HIST_SIZE);
-	p += sprintf(p, "Idx | Start time | Duration | AvgSig | Random | BestThp | BestPro | Stdev | Pktint | AvgSig | MRR usage\n");
+	p += sprintf(p, "Idx | Start time | Duration | AvgSig | Random | BestThp | BestPro | Stdev | Pktint | MRR usage\n");
 
 	/* Table lines */
 	for (i = 0; i < ci->dbg_idx && i < COGTRA_DEBUGFS_HIST_SIZE; i++) {

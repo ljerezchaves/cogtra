@@ -94,7 +94,7 @@ struct cogtra_sta_info {
     unsigned int update_interval; 	// pkts between cogtra_update_stats
 	unsigned long up_stats_counter;	// update stats counter
 	unsigned long last_time;		// jiffies for the last rate adaptation
-	unsigned long fist_time;		// jiffies for the fist rate adaptation
+	unsigned long first_time;		// jiffies for the fist rate adaptation
 	
 	struct cogtra_rate *r;			// rate pointer for each station
 	struct chain_table *t;			// chain table pointer for mrr

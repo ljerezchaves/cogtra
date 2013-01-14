@@ -325,7 +325,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci,
 	ci->update_counter = 0UL;
 
 #ifdef CONFIG_MAC80211_DEBUGFS
-	/* Remaining history information for the last cycle */
+	/* History table information (remaining) for the past cycle: duration, avgsignal and MRR usage */
 	if (ci->dbg_idx < COGTRA_DEBUGFS_HIST_SIZE) {
 		struct chain_table *ct = ci->t;
 		struct cogtra_hist_info *ht = &ci->hi[ci->dbg_idx];
@@ -334,15 +334,16 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci,
 
 		j = jiffies;
 		diff = (long)j - (long)ci->last_time;
-		ci->last_time = j;
-
 		ht->duration_ms = (int)(diff * 1000 / HZ);
+		ci->last_time = j;
+	
 		ht->avg_signal = (int)ewma_read (avg);
 		
-		ht->rand_pct =(int)((100*ct[0].suc) / ci->update_interval); 
-		ht->best_pct =(int)((100*ct[0].suc) / ci->update_interval); 
-		ht->prob_pct =(int)((100*ct[0].suc) / ci->update_interval); 
-		ht->lowr_pct =(int)((100*ct[0].suc) / ci->update_interval); 
+		// FIXME: nao sei se ta funcionando ok :(
+		ht->rand_pct = (int)((100*ct[0].suc) / ci->update_interval); 
+		ht->best_pct = (int)((100*ct[1].suc) / ci->update_interval); 
+		ht->prob_pct = (int)((100*ct[2].suc) / ci->update_interval); 
+		ht->lowr_pct = (int)((100*ct[3].suc) / ci->update_interval); 
 		
 		ci->dbg_idx++;
 	}
@@ -375,17 +376,17 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci,
 #endif
 
 #ifdef CONFIG_MAC80211_DEBUGFS
-	/* History table information for the next cycle */
+	/* History table information for the next cycle*/
 	if (ci->dbg_idx < COGTRA_DEBUGFS_HIST_SIZE) {
 		struct cogtra_hist_info *ht = &ci->hi[ci->dbg_idx];
 
 		diff = (long)j - (long)ci->first_time;
 		ht->start_ms = (int)(diff * 1000 / HZ);
 			
-		ht->rrate = ci->r[ci->random_rate_ndx].bitrate;
-		ht->brate = ci->r[ci->max_tp_rate_ndx].bitrate;
-		ht->prate = ci->r[ci->max_tp_rate_ndx].bitrate;
-		ht->cur+stdev = ci->cur_stdev;
+		ht->rand_rate = ci->r[ci->random_rate_ndx].bitrate;
+		ht->best_rate = ci->r[ci->max_tp_rate_ndx].bitrate;
+		ht->prob_rate = ci->r[ci->max_tp_rate_ndx].bitrate;
+		ht->cur_stdev = ci->cur_stdev;
 		ht->pkt_interval = ci->update_interval;
 	}
 #endif
@@ -552,7 +553,7 @@ cogtra_rate_init (void *priv, struct ieee80211_supported_band *sband,
 	ci->cur_stdev = COGTRA_MAX_STDEV;
 	ci->n_rates = n;
 	ci->update_counter = 0UL;
-	ci->fist_time = ci->last_time = jiffies;
+	ci->first_time = ci->last_time = jiffies;
 }
 
 
