@@ -339,11 +339,11 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci,
 	
 		ht->avg_signal = (int)ewma_read (avg);
 		
-		// FIXME: nao sei se ta funcionando ok :(
-		ht->rand_pct = (int)((100*ct[0].suc) / ci->update_interval); 
-		ht->best_pct = (int)((100*ct[1].suc) / ci->update_interval); 
-		ht->prob_pct = (int)((100*ct[2].suc) / ci->update_interval); 
-		ht->lowr_pct = (int)((100*ct[3].suc) / ci->update_interval); 
+		// FIXME: parece nao estar funcionando... deixei de lado por enquanto
+		// ht->rand_pct = (int)((100*ct[0].suc) / ci->update_interval); 
+		// ht->best_pct = (int)((100*ct[1].suc) / ci->update_interval); 
+		// ht->prob_pct = (int)((100*ct[2].suc) / ci->update_interval); 
+		// ht->lowr_pct = (int)((100*ct[3].suc) / ci->update_interval); 
 		
 		ci->dbg_idx++;
 	}

@@ -155,7 +155,7 @@ cogtra_hist_open (struct inode *inode, struct file *file)
 	struct cogtra_debugfs_info *ch;
 	unsigned int i;
 	char *p;
-	int rest;
+	// int rest;
 
 	ch = kmalloc (sizeof (*ch) 
 			    + sizeof (struct cogtra_hist_info) * COGTRA_DEBUGFS_HIST_SIZE 
@@ -175,7 +175,7 @@ cogtra_hist_open (struct inode *inode, struct file *file)
 	/* Table lines */
 	for (i = 0; i < ci->dbg_idx && i < COGTRA_DEBUGFS_HIST_SIZE; i++) {
 		struct cogtra_hist_info	*t = &ci->hi[i];
-		rest = 100 - t->rand_pct - t->best_pct - t->prob_pct - t->lowr_pct;
+		// rest = 100 - t->rand_pct - t->best_pct - t->prob_pct - t->lowr_pct;
 
 		p += sprintf (p, "%3u | %10d | %8d | %6d | %4u%s | %5u%s | %5u%s | %2u.%2u | %6u | %3d,%3d,%3d,%3d,%3d\n", 
 				i,
@@ -187,11 +187,14 @@ cogtra_hist_open (struct inode *inode, struct file *file)
 				t->prob_rate / 2, (t->prob_rate & 1 ? ".5" : "  "),
 				t->cur_stdev / 100, t->cur_stdev % 100,
 				t->pkt_interval,
-				t->rand_pct > 100 ? 100 : t->rand_pct, 
-				t->best_pct > 100 ? 100 : t->best_pct, 
-				t->prob_pct > 100 ? 100 : t->prob_pct, 
-				t->lowr_pct > 100 ? 100 : t->lowr_pct, 
-				rest < 0 ? 0 : rest
+				
+				// Nao estava funcionando direito entao deixei de lado...
+				0, 0, 0, 0, 0
+				// t->rand_pct > 100 ? 100 : t->rand_pct, 
+				// t->best_pct > 100 ? 100 : t->best_pct, 
+				// t->prob_pct > 100 ? 100 : t->prob_pct, 
+				// t->lowr_pct > 100 ? 100 : t->lowr_pct, 
+				// rest < 0 ? 0 : rest
 			);
 	}
 
