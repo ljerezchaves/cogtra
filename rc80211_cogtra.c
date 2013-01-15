@@ -617,6 +617,9 @@ cogtra_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 
 	kfree (ci->t);
 	kfree (ci->r);
+#ifdef CONFIG_MAC80211_DEBUGFS
+	kfree (ci->hi);
+#endif
 	kfree (ci);
 }
 
