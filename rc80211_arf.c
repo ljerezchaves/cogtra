@@ -82,7 +82,7 @@ sort_bitrates (struct arf_sta_info *ci, int n_rates)
 }
 
 
-static void arf_success (struct arf_sta_info *ci)
+static void arf_success_atfirst (struct arf_sta_info *ci)
 {
 	ci->timer++;
 	ci->success++;
@@ -98,21 +98,30 @@ static void arf_success (struct arf_sta_info *ci)
 	}
 }
 
-
-static void arf_failure (struct arf_sta_info *ci)
+static void arf_success_afterfail (struct arf_sta_info *ci, unsigned int ndx)
 {
-	ci->timer++;
-	ci->failures++;
+	ci->timer = 0;
+	ci->success = 1;
+	ci->failures = 0;
+	ci->recovery = false;
+	ci->current_rate_ndx = ndx;
+}
+
+
+static void arf_failure_afterall (struct arf_sta_info *ci, unsigned int ndx, int failures)
+{
+	ci->timer = failures;
+	ci->failures = failures;
 	ci->success = 0;
-	if (((ci->recovery == true) || (ci->failures >= 2)) &&
-            (ci->current_rate_ndx != 0))
+	ci->recovery = false;
+	ci->current_rate_ndx = ndx;
+	if ((ci->failures >= 2) && (ci->current_rate_ndx != 0))
 	{
 		ci->current_rate_ndx--;
 		ci->timer = 0;
 		ci->failures = 0;
 	}
 }
-
 
 /* arf_tx_status is called just after frame tx and it is used to update
  * statistics information for the used rate */
@@ -125,16 +134,42 @@ arf_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	struct ieee80211_tx_rate *ar = info->status.rates;
 	int i = 0;
    	int success = 0;
- 
-	if (ar[i].idx < 0)
-		return;
+	int ndx;
+	int timer_count = 0;
 
-	/* Checking for a success in frame transmission */
-	success = !!(info->flags & IEEE80211_TX_STAT_ACK);
-	if (success)
-		arf_success (ci);
-	else 
-		arf_failure (ci);
+	/* Checking for a success in packet transmission */
+    success = !!(info->flags & IEEE80211_TX_STAT_ACK);
+
+	/* The tx resulted in success on first attempt. 
+	   Call arf_success () and be ready for next tx */
+	if (success && ar[0].count == 1 && ar[1].idx < 0) {
+		arf_success_atfirst (ci);
+	
+	} else {
+		/* The following code goes through all MRR entries and
+		 * find the last rate_ndx used. */ 
+    	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
+    	    
+			if (ar[i].idx < 0)
+    	        break;
+    	    
+			ndx = rix_to_ndx (ci, ar[i].idx);
+    	    if (ndx < 0)
+    	        continue;
+   
+    	    /* Check if this is the last used rate */
+    	    if (((i < IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) ||
+					(i == IEEE80211_TX_MAX_RATES - 1)) {
+			
+				/* Some attempts failed but the transmission succeed. */
+				if (success) 
+					arf_success_afterfail (ci, ndx);
+				
+				/* The packet was discarded. */
+				else arf_failure_afterall (ci, ndx, cr[i].count);
+			}
+    	}
+	}
 }
 
 
@@ -149,17 +184,29 @@ arf_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	struct arf_sta_info *ci = priv_sta;
 	struct arf_priv *cp = priv;
 	struct ieee80211_tx_rate *ar = info->control.rates;
+	int i;
+	unsigned int rate_ndx;
 
 	/* Check for management or control packet, which should be transmitted
 	 * unsing lower rate */
 	if (rate_control_send_low (sta, priv_sta, txrc))
 		return;
 
-	/* Setting up tx rate information. */
-	ar[0].idx = ci->r[ci->current_rate_ndx].rix;
-	ar[0].count = cp->max_retry;
-	ar[1].idx = -1;
-	ar[1].count = 0;
+	/* Here's the ARF algorithm implemented thanks to MRR capability. At this
+	 * point we are ready for pkt tx attempt. First we are considering that the
+	 * last tx was success... */
+	rate_ndx = ci->current_rate_ndx;
+	for (i = 0; i < 4; i++) {
+		ar[i].idx = ci->r[rate_ndx].rix;
+		ar[i].count = 2;
+		rate_ndx = rate_ndx > 0 ? rate_ndx - 1 : 0;
+	}
+
+	/* In recovery mode (this is the first attemp on current rate) or after a
+	 * last tx attemp, if the first attempt fails, the following should use the
+	 * lowest rate.*/
+	if ((ci->recovery == true) || (ci->failures >= 1))
+		ar[0].count = 1;
 }
 
 
@@ -260,12 +307,15 @@ arf_alloc (struct ieee80211_hw *hw, struct dentry *debugfsdir)
 	cp = kzalloc (sizeof (struct arf_priv), GFP_ATOMIC);
 	if (!cp)
 		return NULL;
-	
+
+	/* Used for the easy of ARF implementation */
+	cp->max_retry = 4;
+
 	/* Max number of retries */
-	if (hw->max_rate_tries > 0)
-		cp->max_retry = hw->max_rate_tries;
-	else
-		cp->max_retry = 7;
+	// if (hw->max_rate_tries > 0)
+	// 	cp->max_retry = hw->max_rate_tries;
+	// else
+	// 	cp->max_retry = 7;
 
 	cp->hw = hw;
 	return cp;

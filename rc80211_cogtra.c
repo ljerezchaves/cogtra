@@ -327,7 +327,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci,
 #ifdef CONFIG_MAC80211_DEBUGFS
 	/* History table information (remaining) for the past cycle: duration, avgsignal and MRR usage */
 	if (ci->dbg_idx < COGTRA_DEBUGFS_HIST_SIZE) {
-		struct chain_table *ct = ci->t;
+		// struct chain_table *ct = ci->t;
 		struct cogtra_hist_info *ht = &ci->hi[ci->dbg_idx];
 		struct sta_info *si = container_of (sta, struct sta_info, sta);
 		struct ewma *avg = &si->avg_signal;
