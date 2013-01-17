@@ -135,7 +135,6 @@ arf_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	int i = 0;
    	int success = 0;
 	int ndx;
-	int timer_count = 0;
 
 	/* Checking for a success in packet transmission */
     success = !!(info->flags & IEEE80211_TX_STAT_ACK);
@@ -166,7 +165,7 @@ arf_tx_status (void *priv, struct ieee80211_supported_band *sband,
 					arf_success_afterfail (ci, ndx);
 				
 				/* The packet was discarded. */
-				else arf_failure_afterall (ci, ndx, cr[i].count);
+				else arf_failure_afterall (ci, ndx, ar[i].count);
 			}
     	}
 	}
@@ -182,7 +181,7 @@ arf_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	struct sk_buff *skb = txrc->skb;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct arf_sta_info *ci = priv_sta;
-	struct arf_priv *cp = priv;
+	//struct arf_priv *cp = priv;
 	struct ieee80211_tx_rate *ar = info->control.rates;
 	int i;
 	unsigned int rate_ndx;
