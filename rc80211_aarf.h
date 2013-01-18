@@ -14,9 +14,17 @@
 
 #define AARF_MIN_SUCC_THRS		10
 #define AARF_MAX_SUCC_THRS		50
-#define AARF_SUCCESS_K			2
+#define AARF_TIMEOUT		    15
 #define AARF_TIMER_K			2
-#define AARF_MIN_TIMEOUT		15
+#define AARF_SUCCESS_K			2
+
+#define AARF_DEBUGFS_HIST_SIZE	1000U
+
+#define AARF_LOG_SUCCESS	1
+#define AARF_LOG_FAILURE	2
+#define AARF_LOG_RECOVER	3
+
+
 
 /* aarf_rate is allocated once for each available rate at each aarf_sta_info.
  * Information in this struct is private to this rate at this station */ 
@@ -38,17 +46,21 @@ struct aarf_sta_info {
 	bool recovery;					// recovery mode
 	unsigned int success_thrs;		// success threshold
 	unsigned int timeout;			// packet timer timeout
-	unsigned int min_timeout;		// minimum packet timer timeout
-	unsigned int min_succ_thrs;		// minimum success threshold
-	unsigned int max_succ_thrs;		// maximun success threshold
-	unsigned int success_k;			// success threshold increase factor
-	unsigned int timeout_k;			// timeout increase factor
+	unsigned int min_timeout;       // minimum packet timer timeout
+	unsigned int min_succ_thrs;     // minimum success threshold
+	unsigned int max_succ_thrs;     // maximun success threshold
+	unsigned int success_k;         // success threshold increase factor
+	unsigned int timeout_k;         // timeout increase factor
+	unsigned int first_time;		//jiffies for the first rate adaptation
 
 	/* Rate pointer for each station (created in aarf_alloc_sta) */
 	struct aarf_rate *r;
 
 #ifdef CONFIG_MAC80211_DEBUGFS
-	struct dentry *dbg_stats;		// debug file pointer 
+	struct aarf_hist_info *hi;		// history table (for the first AARF_DEBUGFS_HIST_SIZE rate adaptations)
+	unsigned int dbg_idx;			// history table index
+	struct dentry *dbg_stats;		// debug rc_stats file pointer
+	struct dentry *dbg_hist;		// debug rc_history file pointer
 #endif
 };
 
@@ -71,6 +83,20 @@ struct aarf_debugfs_info {
 	size_t len;
 	char buf[];
 };
+
+/* Debugfs history table entry */
+struct aarf_hist_info {
+	int start_ms;
+	int rate;
+	int event;
+	int timer;
+	int success;
+	int failures;
+	bool recovery;
+	int success_thrs;
+	int timeout;
+};
+
 
 int aarf_stats_open (struct inode *inode, struct file *file);
 ssize_t aarf_stats_read (struct file *file, char __user *buf, size_t len, 

@@ -95,6 +95,8 @@ static void arf_success_atfirst (struct arf_sta_info *ci)
 		ci->timer = 0;
 		ci->success = 0;
 		ci->recovery = true;
+		
+		arf_log (ci, ARF_LOG_SUCCESS);
 	}
 }
 
@@ -105,6 +107,7 @@ static void arf_success_afterfail (struct arf_sta_info *ci, unsigned int ndx)
 	ci->failures = 0;
 	ci->recovery = false;
 	ci->current_rate_ndx = ndx;
+	// Logging rate change
 }
 
 
@@ -120,6 +123,23 @@ static void arf_failure_afterall (struct arf_sta_info *ci, unsigned int ndx, int
 		ci->current_rate_ndx--;
 		ci->timer = 0;
 		ci->failures = 0;
+		// Logging rate change
+	}
+}
+
+static void arf_log (struct arf_sta_info *ci, int event)
+{
+	unsigned long diff; 
+	
+	if (ci->dbg_idx < ARF_DEBUGFS_HIST_SIZE) {
+		struct arf_hist_info *ht = &ci->hi[ci->dbg_idx];
+		
+		diff = (long)jiffies - (long)ci->first_time;
+		ht->start_ms = (int)(diff * 1000 / HZ);	
+		ht->rate = ci->r[ci->current_rate_ndx].bitrate;
+		ht->event = event;
+		
+		ci->dbg_idx++;
 	}
 }
 
@@ -240,8 +260,16 @@ arf_rate_init (void *priv, struct ieee80211_supported_band *sband,
 		struct arf_rate *cr = &ci->r[i];
 		cr->rix = -1;
 	}
+
+#ifdef CONFIG_MAC80211_DEBUGFS
+	/* Filling information for this first rate adaptation */
+	ci->hi[0].start_ms = 0;
+	ci->hi[0].rate = ci->r[0].bitrate;
+	ci->dbg_idx = 0;
+#endif
 	
 	ci->n_rates = n;
+	ci->first_time = jiffies;
 }
 
 
@@ -274,6 +302,16 @@ arf_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 		return NULL;
 	}
 
+#ifdef CONFIG_MAC80211_DEBUGFS
+	/* If in debugfs mode, memory allocation for history table */
+   	ci->hi = kzalloc (sizeof (struct arf_hist_info) * ARF_DEBUGFS_HIST_SIZE, gfp);
+	if (!ci->hi) {
+		kfree (ci->r);
+		kfree (ci);
+		return NULL;
+	}
+#endif
+
 	ci->current_rate_ndx = 0;
 	ci->success = 0;
 	ci->failures = 0;
@@ -292,6 +330,9 @@ arf_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 {
 	struct arf_sta_info *ci = priv_sta;
 
+#ifdef CONFIG_MAC80211_DEBUGFS
+	kfree (ci->hi);
+#endif
 	kfree (ci->r);
 	kfree (ci);
 }
@@ -307,14 +348,11 @@ arf_alloc (struct ieee80211_hw *hw, struct dentry *debugfsdir)
 	if (!cp)
 		return NULL;
 
-	/* Used for the easy of ARF implementation */
-	cp->max_retry = 4;
-
 	/* Max number of retries */
-	// if (hw->max_rate_tries > 0)
-	// 	cp->max_retry = hw->max_rate_tries;
-	// else
-	// 	cp->max_retry = 7;
+	if (hw->max_rate_tries > 0)
+		cp->max_retry = hw->max_rate_tries;
+	else
+		cp->max_retry = 7;
 
 	cp->hw = hw;
 	return cp;

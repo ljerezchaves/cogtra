@@ -15,6 +15,14 @@
 #define ARF_SUCC_THRS		10
 #define ARF_TIMEOUT		    15
 
+#define ARF_DEBUGFS_HIST_SIZE	1000U
+
+#define ARF_LOG_SUCCESS	1
+#define ARF_LOG_FAILURE	2
+#define ARF_LOG_RECOVER	3
+
+
+
 /* arf_rate is allocated once for each available rate at each arf_sta_info.
  * Information in this struct is private to this rate at this station */ 
 struct arf_rate {
@@ -35,12 +43,16 @@ struct arf_sta_info {
 	bool recovery;					// recovery mode
 	unsigned int success_thrs;		// success threshold
 	unsigned int timeout;			// packet timer timeout
+	unsigned int first_time;		//jiffies for the first rate adaptation
 
 	/* Rate pointer for each station (created in arf_alloc_sta) */
 	struct arf_rate *r;
 
 #ifdef CONFIG_MAC80211_DEBUGFS
-	struct dentry *dbg_stats;		// debug file pointer 
+	struct arf_hist_info *hi;		// history table (for the first ARF_DEBUGFS_HIST_SIZE rate adaptations)
+	unsigned int dbg_idx;			// history table index
+	struct dentry *dbg_stats;		// debug rc_stats file pointer
+	struct dentry *dbg_hist;		// debug rc_history file pointer
 #endif
 };
 
@@ -63,6 +75,15 @@ struct arf_debugfs_info {
 	size_t len;
 	char buf[];
 };
+
+/* Debugfs history table entry */
+struct arf_hist_info {
+	int start_ms;					// Time of rate adaptation (milisec)
+	//int avg_signal;					// EWMA signal for this cycle (-dBi)
+	int rate;
+	int event;
+};
+
 
 int arf_stats_open (struct inode *inode, struct file *file);
 ssize_t arf_stats_read (struct file *file, char __user *buf, size_t len, 

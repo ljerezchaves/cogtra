@@ -428,7 +428,8 @@ cogtra_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	
 		/* If it is the last used rate and resultesd in tx success, also
 		 * increse the success counter */
-		if ((i != IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) {
+		if (((i != IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) ||
+				(i == IEEE80211_TX_MAX_RATES - 1)) {
 			ci->r[ndx].success += success;
 			ct[i].suc += success;
 		}
