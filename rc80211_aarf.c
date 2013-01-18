@@ -81,40 +81,74 @@ sort_bitrates (struct aarf_sta_info *ci, int n_rates)
 	}
 }
 
+static void aarf_sync (struct aarf_sta_info *ci, int rate_ndx)
+{
+	printk ("AARF: Sync... from %d to %d\n", ci->current_rate_ndx, rate_ndx);
+    // ci->current_rate_ndx = (unsigned int)rate_ndx;
+}
 
+static void aarf_log (struct aarf_sta_info *ci, int event, int rate, int last)
+{
+	unsigned long diff; 
+	
+	if (ci->dbg_idx < AARF_DEBUGFS_HIST_SIZE) {
+		struct aarf_hist_info *ht = &ci->hi[ci->dbg_idx];
+		
+		diff = (long)jiffies - (long)ci->first_time;
+		ht->start_ms = (int)(diff * 1000 / HZ);	
+		ht->rate = ci->r[rate].bitrate;
+		ht->last = ci->r[last].bitrate;
+		ht->event = event;
+		ht->timer = ci->timer;
+		ht->success = ci->success;
+		ht->failures = ci->failures;
+		ht->recovery = ci->recovery;
+		ht->success_thrs = ci->success_thrs;
+		ht->timeout = ci->timeout;
+		ci->dbg_idx++;	
+	}
+}
 
 static void aarf_att_success (struct aarf_sta_info *ci, int rate)
 {
-	if (rate == ci->current_rate_ndx) 
-		printk ("AARF: Error...");
+	if (rate != ci->current_rate_ndx) 
+        aarf_sync (ci, rate);
 
 	ci->timer++;
 	ci->success++;
 	ci->failures = 0;
 	ci->recovery = false;
-	if (((ci->success >= ci->success_thrs) || (ci->timer >= ci->timeout)) &&
-			(ci->current_rate_ndx < (ci->n_rates - 1)))
+
+	if (ci->current_rate_ndx < (ci->n_rates - 1))
 	{
-		aarf_log (ci, AARF_LOG_SUCCESS);
-		ci->current_rate_ndx++;
-		ci->timer = 0;
-		ci->success = 0;
-		ci->recovery = true;
+        if (ci->success >= ci->success_thrs) {
+    		aarf_log (ci, AARF_LOG_SUCCESS, ci->current_rate_ndx+1, ci->current_rate_ndx);
+		    ci->current_rate_ndx++;
+		    ci->timer = 0;
+		    ci->success = 0;
+		    ci->recovery = true;
+        } else if (ci->timer >= ci->timeout) {
+    		aarf_log (ci, AARF_LOG_TIMEOUT, ci->current_rate_ndx+1, ci->current_rate_ndx);
+		    ci->current_rate_ndx++;
+		    ci->timer = 0;
+		    ci->success = 0;
+		    ci->recovery = true;
+       }
 	}
 }
 
 
 static void aarf_att_failure (struct aarf_sta_info *ci, int rate)
 {
-	if (rate == ci->current_rate_ndx) 
-		printk ("AARF: Error...");
+	if (rate != ci->current_rate_ndx) 
+        aarf_sync (ci, rate);
 
 	ci->timer++;
 	ci->failures++;
 	ci->success = 0;
 	if (ci->recovery == true)
 	{
-		aarf_log (ci, AARF_LOG_RECOVER);
+		aarf_log (ci, AARF_LOG_RECOVER, ci->current_rate_ndx-1 < 0 ? 0 : ci->current_rate_ndx-1, ci->current_rate_ndx);
 		ci->timer = 0;
 		ci->failures = 0;
 		ci->timeout = max (ci->timeout * ci->timeout_k, ci->min_succ_thrs);
@@ -125,34 +159,13 @@ static void aarf_att_failure (struct aarf_sta_info *ci, int rate)
 	}
 	else if (ci->failures >= 2)
 	{
-		aarf_log (ci, AARF_LOG_FAILURE);
+		aarf_log (ci, AARF_LOG_FAILURE, ci->current_rate_ndx-1 < 0 ? 0 : ci->current_rate_ndx-1, ci->current_rate_ndx);
 		ci->timer = 0;
 		ci->failures = 0;
 		ci->timeout = ci->min_timeout;
 		ci->success_thrs = ci->min_succ_thrs;
 		if (ci->current_rate_ndx > 0)
 			ci->current_rate_ndx--;
-	}
-}
-
-static void aarf_log (struct aarf_sta_info *ci, int event)
-{
-	unsigned long diff; 
-	
-	if (ci->dbg_idx < AARF_DEBUGFS_HIST_SIZE) {
-		struct aarf_hist_info *ht = &ci->hi[ci->dbg_idx];
-		
-		diff = (long)jiffies - (long)ci->first_time;
-		ht->start_ms = (int)(diff * 1000 / HZ);	
-		ht->rate = ci->r[ci->current_rate_ndx].bitrate;
-		ht->event = event;
-		ht->timer = ci->timer;
-		ht->success = ci->success;
-		ht->failures = ci->failures;
-		ht->recovery = ci->recovery;
-		ht->success_thrs = ci->success_thrs;
-		ht->timeout = ci->timeout;
-		ci->dbg_idx++;	
 	}
 }
 
@@ -173,7 +186,7 @@ aarf_tx_status (void *priv, struct ieee80211_supported_band *sband,
     success = !!(info->flags & IEEE80211_TX_STAT_ACK);
 
 	/* The logic is: I need to figure out if how much attemps were performed,
-	 * and call the respective funcions in the corred order... There are 3
+	 * and call the respective funcions in the correct order... There are 3
 	 * possibilities: 
 	 *	1) The tx succeed at fisrt attempt 
 	 *	2) The tx succeed after some failed attempt
@@ -237,7 +250,6 @@ aarf_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	struct sk_buff *skb = txrc->skb;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct aarf_sta_info *ci = priv_sta;
-	//struct aarf_priv *cp = priv;
 	struct ieee80211_tx_rate *ar = info->control.rates;
 	int i;
 	unsigned int rate_ndx;
@@ -303,13 +315,6 @@ aarf_rate_init (void *priv, struct ieee80211_supported_band *sband,
 		cr->rix = -1;
 	}
 
-#ifdef CONFIG_MAC80211_DEBUGFS
-	/* Filling information for this first rate adaptation */
-	// ci->hi[0].start_ms = 0;
-	// ci->hi[0].rate = ci->r[0].bitrate;
-	// ci->dbg_idx = 0;
-#endif
-
 	ci->dbg_idx = 0;	
 	ci->n_rates = n;
 	ci->first_time = jiffies;
@@ -359,7 +364,7 @@ aarf_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 	ci->success = 0;
 	ci->failures = 0;
 	ci->timer = 0;
-	ci->recovery = false;i
+	ci->recovery = false;
 	ci->success_thrs = AARF_MIN_SUCC_THRS;
 	ci->timeout = AARF_MIN_TIMEOUT;
 	ci->min_timeout = AARF_MIN_TIMEOUT;

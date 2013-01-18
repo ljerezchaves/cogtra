@@ -131,22 +131,23 @@ aarf_hist_open (struct inode *inode, struct file *file)
 	p += sprintf (p, "Adaptive Auto Rate Fallback (AARF)\n");
 	p += sprintf (p, "History Information Table\n"); 
 	p += sprintf (p, "Rate adaptations: %u (max of %u)\n\n", ci->dbg_idx, AARF_DEBUGFS_HIST_SIZE);
-	p += sprintf (p, "Idx | Start time | Event | Rate | Timer | Succ | Fail | Recover | succ_ths | timeout \n");
+	p += sprintf (p, "Idx | Start time |  Event  | Rate -> Rate | Timer | Succ | Fail | Recover | succ_ths | timeout \n");
 
 	/* Table lines */
 	for (i = 0; i < ci->dbg_idx && i < AARF_DEBUGFS_HIST_SIZE; i++) {
 		struct aarf_hist_info	*t = &ci->hi[i];
 
-		p += sprintf (p, "%3u | %10d | %s | %2u%s | %5d | %4d | %4d | %s | %8d | %7d \n", 
+		p += sprintf (p, "%3u | %10d | %s | %2u%s%s%2u%s | %5d | %4d | %4d | %s | %8d | %7d \n", 
 				i,
 				t->start_ms,
-				(t->event == AARF_LOG_SUCCESS ? "Success" : (t->event == AARF_LOG_FAILURE ? "Failure": "Recover")),				
+				(t->event == AARF_LOG_SUCCESS ? "Success" : (t->event == AARF_LOG_FAILURE ? "Failure": (t->event == AARF_LOG_RECOVER ? "Recover" : "Timeout"))),				
+				t->last / 2, (t->last & 1 ? ".5" : "  "), " -> ",
 				t->rate / 2, (t->rate & 1 ? ".5" : "  "),
 				t->timer,
 				t->success,
 				t->failures,
 				((t->recovery) ? "  true " : " false "),
-				t->succ_ths,
+				t->success_thrs,
 				t->timeout				
 			);
 	}

@@ -14,7 +14,7 @@
 
 #define AARF_MIN_SUCC_THRS		10
 #define AARF_MAX_SUCC_THRS		50
-#define AARF_TIMEOUT		    15
+#define AARF_MIN_TIMEOUT		15
 #define AARF_TIMER_K			2
 #define AARF_SUCCESS_K			2
 
@@ -23,6 +23,7 @@
 #define AARF_LOG_SUCCESS	1
 #define AARF_LOG_FAILURE	2
 #define AARF_LOG_RECOVER	3
+#define AARF_LOG_TIMEOUT	4
 
 
 
@@ -88,6 +89,7 @@ struct aarf_debugfs_info {
 struct aarf_hist_info {
 	int start_ms;
 	int rate;
+    int last;
 	int event;
 	int timer;
 	int success;
