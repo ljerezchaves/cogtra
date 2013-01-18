@@ -48,11 +48,11 @@
 #include <linux/slab.h>
 #include <net/mac80211.h>
 #include "rate.h"
-#include "rc80211_arf.h"
+#include "rc80211_aarf.h"
 
 /* Converting mac80211 rate index into local array index */
 static inline int
-rix_to_ndx (struct arf_sta_info *ci, int rix)
+rix_to_ndx (struct aarf_sta_info *ci, int rix)
 {
 	int i;
 	for (i = ci->n_rates - 1; i >= 0; i--)
@@ -81,53 +81,13 @@ sort_bitrates (struct arf_sta_info *ci, int n_rates)
 	}
 }
 
-
-static void arf_success_atfirst (struct arf_sta_info *ci)
+static void arf_sync (struct arf_sta_info *ci, int rate_ndx)
 {
-	ci->timer++;
-	ci->success++;
-	ci->failures = 0;
-	ci->recovery = false;
-	if (((ci->success >= ci->success_thrs) || (ci->timer >= ci->timeout)) &&
-			(ci->current_rate_ndx < (ci->n_rates - 1)))
-	{
-		ci->current_rate_ndx++;
-		ci->timer = 0;
-		ci->success = 0;
-		ci->recovery = true;
-		
-		arf_log (ci, ARF_LOG_SUCCESS);
-	}
+	printk ("ARF: Sync... from %d to %d\n", ci->current_rate_ndx, rate_ndx);
+    // ci->current_rate_ndx = (unsigned int)rate_ndx;
 }
 
-static void arf_success_afterfail (struct arf_sta_info *ci, unsigned int ndx)
-{
-	ci->timer = 0;
-	ci->success = 1;
-	ci->failures = 0;
-	ci->recovery = false;
-	ci->current_rate_ndx = ndx;
-	// Logging rate change
-}
-
-
-static void arf_failure_afterall (struct arf_sta_info *ci, unsigned int ndx, int failures)
-{
-	ci->timer = failures;
-	ci->failures = failures;
-	ci->success = 0;
-	ci->recovery = false;
-	ci->current_rate_ndx = ndx;
-	if ((ci->failures >= 2) && (ci->current_rate_ndx != 0))
-	{
-		ci->current_rate_ndx--;
-		ci->timer = 0;
-		ci->failures = 0;
-		// Logging rate change
-	}
-}
-
-static void arf_log (struct arf_sta_info *ci, int event)
+static void arf_log (struct arf_sta_info *ci, int event, int rate, int last)
 {
 	unsigned long diff; 
 	
@@ -136,10 +96,76 @@ static void arf_log (struct arf_sta_info *ci, int event)
 		
 		diff = (long)jiffies - (long)ci->first_time;
 		ht->start_ms = (int)(diff * 1000 / HZ);	
-		ht->rate = ci->r[ci->current_rate_ndx].bitrate;
+		ht->rate = ci->r[rate].bitrate;
+		ht->last = ci->r[last].bitrate;
 		ht->event = event;
-		
-		ci->dbg_idx++;
+		ht->timer = ci->timer;
+		ht->success = ci->success;
+		ht->failures = ci->failures;
+		ht->recovery = ci->recovery;
+		ht->success_thrs = ci->success_thrs;
+		ht->timeout = ci->timeout;
+		ci->dbg_idx++;	
+	}
+}
+
+static void arf_att_success (struct arf_sta_info *ci, int rate)
+{
+	if (rate != ci->current_rate_ndx) 
+        arf_sync (ci, rate);
+
+	ci->timer++;
+	ci->success++;
+	ci->failures = 0;
+	ci->recovery = false;
+
+	if (ci->current_rate_ndx < (ci->n_rates - 1))
+	{
+        if (ci->success >= ci->success_thrs) {
+    		arf_log (ci, ARF_LOG_SUCCESS, ci->current_rate_ndx+1, ci->current_rate_ndx);
+		    ci->current_rate_ndx++;
+		    ci->timer = 0;
+		    ci->success = 0;
+		    ci->recovery = true;
+        } else if (ci->timer >= ci->timeout) {
+    		arf_log (ci, ARF_LOG_TIMEOUT, ci->current_rate_ndx+1, ci->current_rate_ndx);
+		    ci->current_rate_ndx++;
+		    ci->timer = 0;
+		    ci->success = 0;
+		    ci->recovery = true;
+       }
+	}
+}
+
+
+static void arf_att_failure (struct arf_sta_info *ci, int rate)
+{
+	if (rate != ci->current_rate_ndx) 
+        arf_sync (ci, rate);
+
+	ci->timer++;
+	ci->failures++;
+	ci->success = 0;
+	if (ci->recovery == true)
+	{
+		arf_log (ci, ARF_LOG_RECOVER, ci->current_rate_ndx-1 < 0 ? 0 : ci->current_rate_ndx-1, ci->current_rate_ndx);
+		ci->timer = 0;
+		ci->failures = 0;
+		ci->timeout = max (ci->timeout * ci->timeout_k, ci->min_succ_thrs);
+		ci->success_thrs = min (ci->success_thrs * ci->success_k,
+				ci->max_succ_thrs);
+		if (ci->current_rate_ndx > 0)
+			ci->current_rate_ndx--;
+	}
+	else if (ci->failures >= 2)
+	{
+		arf_log (ci, ARF_LOG_FAILURE, ci->current_rate_ndx-1 < 0 ? 0 : ci->current_rate_ndx-1, ci->current_rate_ndx);
+		ci->timer = 0;
+		ci->failures = 0;
+		ci->timeout = ci->min_timeout;
+		ci->success_thrs = ci->min_succ_thrs;
+		if (ci->current_rate_ndx > 0)
+			ci->current_rate_ndx--;
 	}
 }
 
@@ -152,42 +178,65 @@ arf_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	struct arf_sta_info *ci = priv_sta;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_tx_rate *ar = info->status.rates;
-	int i = 0;
+	int i = 0, j = 0;
    	int success = 0;
 	int ndx;
 
 	/* Checking for a success in packet transmission */
     success = !!(info->flags & IEEE80211_TX_STAT_ACK);
 
-	/* The tx resulted in success on first attempt. 
-	   Call arf_success () and be ready for next tx */
-	if (success && ar[0].count == 1 && ar[1].idx < 0) {
-		arf_success_atfirst (ci);
+	/* The logic is: I need to figure out if how much attemps were performed,
+	 * and call the respective funcions in the correct order... There are 3
+	 * possibilities: 
+	 *	1) The tx succeed at fisrt attempt 
+	 *	2) The tx succeed after some failed attempt
+	 *	3) The tx failed after all attempts	
+	 */
+
+	/* The tx succeed... */
+	if (success) {
+
+		/* ... at first attempt. */
+		if (ar[0].count == 1 && ar[1].idx < 0) {
+	   	   	ndx = rix_to_ndx (ci, ar[i].idx);
+			arf_att_success (ci, ndx);
+			return;
+		}
+
+		/* ... after some failed attempts */
+		for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
+	   		if (ar[i].idx < 0) break;	// Not used
+	   	   	ndx = rix_to_ndx (ci, ar[i].idx);
+	   	    if (ndx < 0) continue;		// Invalid
+	   					
+	   	    /* Check if this is the last used rate */
+	   	    if (((i < IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) ||
+	   				(i == IEEE80211_TX_MAX_RATES - 1)) {
+
+				/* There are possible failed attemps on this rate, but
+				 * definetelly the last attemp was an success. */
+				for (j = 0; j < ar[i].count - 1; j++)
+					arf_att_failure (ci, ndx);
+				arf_att_success (ci, ndx);	
+	   		
+			/* This is not the last rate. Compute failed attempts. */
+			} else {
+				for (j = 0; j < ar[i].count; j++)
+					arf_att_failure (ci, ndx);
+	   		}
+	   	}
 	
+	/* The tx failed after all attempts. */
 	} else {
-		/* The following code goes through all MRR entries and
-		 * find the last rate_ndx used. */ 
-    	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
-    	    
-			if (ar[i].idx < 0)
-    	        break;
-    	    
-			ndx = rix_to_ndx (ci, ar[i].idx);
-    	    if (ndx < 0)
-    	        continue;
-   
-    	    /* Check if this is the last used rate */
-    	    if (((i < IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) ||
-					(i == IEEE80211_TX_MAX_RATES - 1)) {
-			
-				/* Some attempts failed but the transmission succeed. */
-				if (success) 
-					arf_success_afterfail (ci, ndx);
-				
-				/* The packet was discarded. */
-				else arf_failure_afterall (ci, ndx, ar[i].count);
-			}
-    	}
+   		for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
+   			if (ar[i].idx < 0) break;	// Not used
+	   	   	ndx = rix_to_ndx (ci, ar[i].idx);
+	   	    if (ndx < 0) continue;		// Invalid
+	   			
+			/* Compute failed attempts */			
+			for (j = 0; j < ar[i].count; j++)
+				arf_att_failure (ci, ndx);
+   		}
 	}
 }
 
@@ -201,7 +250,6 @@ arf_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	struct sk_buff *skb = txrc->skb;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct arf_sta_info *ci = priv_sta;
-	//struct arf_priv *cp = priv;
 	struct ieee80211_tx_rate *ar = info->control.rates;
 	int i;
 	unsigned int rate_ndx;
@@ -212,20 +260,26 @@ arf_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 		return;
 
 	/* Here's the ARF algorithm implemented thanks to MRR capability. At this
-	 * point we are ready for pkt tx attempt. First we are considering that the
-	 * last tx was success... */
+	 * point we are ready for pkt tx attempt. Our only concern here is about
+	 * failedd tx attemps, for which wee need to previous setup the MRR chain
+	 * table in accordance. First we are considering that the last tx succedd
+	 */
 	rate_ndx = ci->current_rate_ndx;
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
 		ar[i].idx = ci->r[rate_ndx].rix;
 		ar[i].count = 2;
 		rate_ndx = rate_ndx > 0 ? rate_ndx - 1 : 0;
 	}
 
-	/* In recovery mode (this is the first attemp on current rate) or after a
-	 * last tx attemp, if the first attempt fails, the following should use the
-	 * lowest rate.*/
+	/* Now let's check if we are in recovery mode (the first attemp on current
+	 * rate) or if the last attemp on this rate failed. In these cases we can
+	 * try only once on the first rate. */
 	if ((ci->recovery == true) || (ci->failures >= 1))
 		ar[0].count = 1;
+
+	/* NOTE: This code above only works because ARF always reduce the rate
+	 * after 1 or 2 attemps on the same rate. If you want to change this number
+	 * this code will demand adjustments. */
 }
 
 
@@ -261,13 +315,7 @@ arf_rate_init (void *priv, struct ieee80211_supported_band *sband,
 		cr->rix = -1;
 	}
 
-#ifdef CONFIG_MAC80211_DEBUGFS
-	/* Filling information for this first rate adaptation */
-	ci->hi[0].start_ms = 0;
-	ci->hi[0].rate = ci->r[0].bitrate;
-	ci->dbg_idx = 0;
-#endif
-	
+	ci->dbg_idx = 0;	
 	ci->n_rates = n;
 	ci->first_time = jiffies;
 }
@@ -317,8 +365,13 @@ arf_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 	ci->failures = 0;
 	ci->timer = 0;
 	ci->recovery = false;
-	ci->success_thrs = ARF_SUCC_THRS;
-	ci->timeout = ARF_TIMEOUT;
+	ci->success_thrs = ARF_MIN_SUCC_THRS;
+	ci->timeout = ARF_MIN_TIMEOUT;
+	ci->min_timeout = ARF_MIN_TIMEOUT;
+	ci->min_succ_thrs = ARF_MIN_SUCC_THRS;
+	ci->max_succ_thrs = ARF_MAX_SUCC_THRS;
+	ci->success_k = ARF_SUCCESS_K;
+	ci->timeout_k = ARF_TIMER_K;
 
 	return ci;
 }

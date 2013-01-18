@@ -83,23 +83,95 @@ arf_stats_open (struct inode *inode, struct file *file)
 			"   Timer: %2u\n"
 			"   Timeout: %2u\n"
 			"   Recovery mode: %s\n\n"
-		    "   Number of rates: %2u\n",
-            cr->bitrate / 2, (cr->bitrate & 1 ? ".5" : "  "),
+		    "   Number of rates: %2u\n"
+			"   Minimum timeout: %2u\n"
+			"   Minimum success threshold: %2u\n"
+			"   Maximum success threshold: %2u\n"
+			"   Success increase factor: %2u\n"
+			"   Timeout increase factor: %2u\n",
+		    cr->bitrate / 2, (cr->bitrate & 1 ? ".5" : "  "),
 			ci->success,
 			ci->failures,
 			ci->success_thrs,
 			ci->timer,
 			ci->timeout,
             ((ci->recovery) ? "true" : "false"),
-            ci->n_rates
+		    
+            ci->n_rates,
+			ci->min_timeout,
+			ci->min_succ_thrs,
+			ci->max_succ_thrs,
+			ci->success_k,
+			ci->timeout_k
 	);
 
 	cs->len = p - cs->buf;
 	return 0;
 }
 
+/* Information for rc_history file */
+int
+arf_hist_open (struct inode *inode, struct file *file)
+{
+	struct arf_sta_info *ci = inode->i_private;
+	struct arf_debugfs_info *ch;
+	unsigned int i;
+	char *p;
+
+	ch = kmalloc (sizeof (*ch) 
+			    + sizeof (struct arf_hist_info) * ARF_DEBUGFS_HIST_SIZE 
+				+ 1024, GFP_KERNEL);
+	if (!ch)
+		return -ENOMEM;
+
+	file->private_data = ch;
+	p = ch->buf;
+
+	/* Table header */
+	p += sprintf (p, "Auto Rate Fallback (ARF)\n");
+	p += sprintf (p, "History Information Table\n"); 
+	p += sprintf (p, "Rate adaptations: %u (max of %u)\n\n", ci->dbg_idx, ARF_DEBUGFS_HIST_SIZE);
+	p += sprintf (p, "Idx | Start time |  Event  | Rate -> Rate | Timer | Succ | Fail | Recover | succ_ths | timeout \n");
+
+	/* Table lines */
+	for (i = 0; i < ci->dbg_idx && i < ARF_DEBUGFS_HIST_SIZE; i++) {
+		struct arf_hist_info	*t = &ci->hi[i];
+
+		p += sprintf (p, "%3u | %10d | %s | %2u%s%s%2u%s | %5d | %4d | %4d | %s | %8d | %7d \n", 
+				i,
+				t->start_ms,
+				(t->event == ARF_LOG_SUCCESS ? "Success" : (t->event == ARF_LOG_FAILURE ? "Failure": (t->event == ARF_LOG_RECOVER ? "Recover" : "Timeout"))),				
+				t->last / 2, (t->last & 1 ? ".5" : "  "), " -> ",
+				t->rate / 2, (t->rate & 1 ? ".5" : "  "),
+				t->timer,
+				t->success,
+				t->failures,
+				((t->recovery) ? "  true " : " false "),
+				t->success_thrs,
+				t->timeout				
+			);
+	}
+
+	if (i == ARF_DEBUGFS_HIST_SIZE)
+		p += sprintf (p, "\n   *** Table Full... ***\n");
+
+	ch->len = p - ch->buf;
+	return 0;
+}
+
+
+
 ssize_t
 arf_stats_read (struct file *file, char __user *buf, size_t len, loff_t *ppos)
+{
+	struct arf_debugfs_info *cs;
+
+	cs = file->private_data;
+	return simple_read_from_buffer (buf, len, ppos, cs->buf, cs->len);
+}
+
+ssize_t
+arf_hist_read (struct file *file, char __user *buf, size_t len, loff_t *ppos)
 {
 	struct arf_debugfs_info *cs;
 
@@ -114,11 +186,25 @@ arf_stats_release (struct inode *inode, struct file *file)
 	return 0;
 }
 
+int
+arf_hist_release (struct inode *inode, struct file *file)
+{
+	kfree (file->private_data);
+	return 0;
+}
+
 static const struct file_operations arf_stat_fops = {
 	.owner = THIS_MODULE,
 	.open = arf_stats_open,
 	.read = arf_stats_read,
 	.release = arf_stats_release,
+};
+
+static const struct file_operations arf_hist_fops = {
+	.owner = THIS_MODULE,
+	.open = arf_hist_open,
+	.read = arf_hist_read,
+	.release = arf_hist_release,
 };
 
 void
@@ -128,6 +214,8 @@ arf_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir)
 
 	ci->dbg_stats = debugfs_create_file ("rc_stats", S_IRUGO, dir,
 			ci, &arf_stat_fops); 
+	ci->dbg_hist = debugfs_create_file ("rc_history", S_IRUGO, dir,
+			ci, &arf_hist_fops); 
 }
 
 void
@@ -136,4 +224,5 @@ arf_remove_sta_debugfs(void *priv, void *priv_sta)
 	struct arf_sta_info *ci = priv_sta;
 	
 	debugfs_remove (ci->dbg_stats);
+	debugfs_remove (ci->dbg_hist);
 }

@@ -12,16 +12,18 @@
 #ifndef __RC_ARF_H
 #define __RC_ARF_H
 
-#define ARF_SUCC_THRS		10
-#define ARF_TIMEOUT		    15
+#define ARF_MIN_SUCC_THRS		10
+#define ARF_MAX_SUCC_THRS		10
+#define ARF_MIN_TIMEOUT			15
+#define ARF_TIMER_K				1
+#define ARF_SUCCESS_K			1
 
 #define ARF_DEBUGFS_HIST_SIZE	1000U
 
 #define ARF_LOG_SUCCESS	1
 #define ARF_LOG_FAILURE	2
 #define ARF_LOG_RECOVER	3
-
-
+#define ARF_LOG_TIMEOUT	4
 
 /* arf_rate is allocated once for each available rate at each arf_sta_info.
  * Information in this struct is private to this rate at this station */ 
@@ -43,6 +45,11 @@ struct arf_sta_info {
 	bool recovery;					// recovery mode
 	unsigned int success_thrs;		// success threshold
 	unsigned int timeout;			// packet timer timeout
+	unsigned int min_timeout;       // minimum packet timer timeout
+	unsigned int min_succ_thrs;     // minimum success threshold
+	unsigned int max_succ_thrs;     // maximun success threshold
+	unsigned int success_k;         // success threshold increase factor
+	unsigned int timeout_k;         // timeout increase factor
 	unsigned int first_time;		//jiffies for the first rate adaptation
 
 	/* Rate pointer for each station (created in arf_alloc_sta) */
@@ -78,10 +85,16 @@ struct arf_debugfs_info {
 
 /* Debugfs history table entry */
 struct arf_hist_info {
-	int start_ms;					// Time of rate adaptation (milisec)
-	//int avg_signal;					// EWMA signal for this cycle (-dBi)
+	int start_ms;
 	int rate;
+    int last;
 	int event;
+	int timer;
+	int success;
+	int failures;
+	bool recovery;
+	int success_thrs;
+	int timeout;
 };
 
 
