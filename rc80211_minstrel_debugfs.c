@@ -123,14 +123,14 @@ minstrel_hist_open (struct inode *inode, struct file *file)
 	/* Table header */
 	p += sprintf (p, "Minstrel\n");
 	p += sprintf (p, "History Information Table\n"); 
-	p += sprintf (p, "Rate adaptations: %u (max of %u)\n\n", ci->dbg_idx, Minstrel_DEBUGFS_HIST_SIZE);
+	p += sprintf (p, "Rate adaptations: %u (max of %u)\n\n", ci->dbg_idx, MINSTREL_DEBUGFS_HIST_SIZE);
 	p += sprintf (p, "Idx | Start time | Rate | Lookaround \n");
 
 	/* Table lines */
 	for (i = 0; i < ci->dbg_idx && i < MINSTREL_DEBUGFS_HIST_SIZE; i++) {
 		struct minstrel_hist_info	*t = &ci->hi[i];
 
-		p += sprintf (p, "%3u | %10d | %2u.%2u | %s\n", 
+		p += sprintf (p, "%3u | %10d | %2u.%s | %s\n", 
 				i,
 				t->start_ms,
 				t->rate / 2, (t->rate & 1 ? ".5" : "  "),
