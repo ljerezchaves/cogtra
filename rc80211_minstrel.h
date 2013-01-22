@@ -9,6 +9,8 @@
 #ifndef __RC_MINSTREL_H
 #define __RC_MINSTREL_H
 
+#define MINSTREL_DEBUGFS_HIST_SIZE	1000U
+
 struct minstrel_rate {
 	int bitrate;
 	int rix;
@@ -55,6 +57,8 @@ struct minstrel_sta_info {
 	unsigned int sample_idx;
 	unsigned int sample_column;
 
+	unsigned int first_time;
+
 	int n_rates;
 	struct minstrel_rate *r;
 	bool prev_sample;
@@ -64,6 +68,9 @@ struct minstrel_sta_info {
 
 #ifdef CONFIG_MAC80211_DEBUGFS
 	struct dentry *dbg_stats;
+	struct minstrel_hist_info *hi;
+	unsigned int dbg_idx;
+	struct dentry *dbg_hist;
 #endif
 };
 
@@ -90,6 +97,12 @@ struct minstrel_priv {
 	struct dentry *dbg_fixed_rate;
 #endif
 
+};
+
+struct minstrel_hist_info {
+	int start_ms;
+	int rate;
+	bool lookaround;
 };
 
 struct minstrel_debugfs_info {

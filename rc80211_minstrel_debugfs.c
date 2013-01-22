@@ -102,6 +102,50 @@ minstrel_stats_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+/* Information for rc_history file */
+int
+minstrel_hist_open (struct inode *inode, struct file *file)
+{
+	struct minstrel_sta_info *ci = inode->i_private;
+	struct minstrel_debugfs_info *ch;
+	unsigned int i;
+	char *p;
+
+	ch = kmalloc (sizeof (*ch) 
+			    + sizeof (struct minstrel_hist_info) * MINSTREL_DEBUGFS_HIST_SIZE 
+				+ 1024, GFP_KERNEL);
+	if (!ch)
+		return -ENOMEM;
+
+	file->private_data = ch;
+	p = ch->buf;
+
+	/* Table header */
+	p += sprintf (p, "Minstrel\n");
+	p += sprintf (p, "History Information Table\n"); 
+	p += sprintf (p, "Rate adaptations: %u (max of %u)\n\n", ci->dbg_idx, Minstrel_DEBUGFS_HIST_SIZE);
+	p += sprintf (p, "Idx | Start time | Rate | Lookaround \n");
+
+	/* Table lines */
+	for (i = 0; i < ci->dbg_idx && i < MINSTREL_DEBUGFS_HIST_SIZE; i++) {
+		struct minstrel_hist_info	*t = &ci->hi[i];
+
+		p += sprintf (p, "%3u | %10d | %2u.%2u | %s\n", 
+				i,
+				t->start_ms,
+				t->rate / 2, (t->rate & 1 ? ".5" : "  "),
+				(t->lookaround ? "true" : "false")	
+			);
+	}
+
+	if (i == MINSTREL_DEBUGFS_HIST_SIZE)
+		p += sprintf (p, "\n   *** Table Full... ***\n");
+
+	ch->len = p - ch->buf;
+	return 0;
+}
+
+
 ssize_t
 minstrel_stats_read(struct file *file, char __user *buf, size_t len, loff_t *ppos)
 {
@@ -111,10 +155,26 @@ minstrel_stats_read(struct file *file, char __user *buf, size_t len, loff_t *ppo
 	return simple_read_from_buffer(buf, len, ppos, ms->buf, ms->len);
 }
 
+ssize_t
+minstrel_hist_read(struct file *file, char __user *buf, size_t len, loff_t *ppos)
+{
+	struct minstrel_debugfs_info *ms;
+
+	ms = file->private_data;
+	return simple_read_from_buffer(buf, len, ppos, ms->buf, ms->len);
+}
+	
 int
 minstrel_stats_release(struct inode *inode, struct file *file)
 {
 	kfree(file->private_data);
+	return 0;
+}
+
+int
+minstrel_hist_release (struct inode *inode, struct file *file)
+{
+	kfree (file->private_data);
 	return 0;
 }
 
@@ -126,6 +186,13 @@ static const struct file_operations minstrel_stat_fops = {
 	.llseek = default_llseek,
 };
 
+static const struct file_operations minstrel_hist_fops = {
+	.owner = THIS_MODULE,
+	.open = minstrel_hist_open,
+	.read = minstrel_hist_read,
+	.release = minstrel_hist_release,
+};
+
 void
 minstrel_add_sta_debugfs(void *priv, void *priv_sta, struct dentry *dir)
 {
@@ -133,6 +200,8 @@ minstrel_add_sta_debugfs(void *priv, void *priv_sta, struct dentry *dir)
 
 	mi->dbg_stats = debugfs_create_file("rc_stats", S_IRUGO, dir, mi,
 			&minstrel_stat_fops);
+	mi->dbg_hist = debugfs_create_file ("rc_history", S_IRUGO, dir,
+			mi, &minstrel_hist_fops);
 }
 
 void
@@ -141,4 +210,5 @@ minstrel_remove_sta_debugfs(void *priv, void *priv_sta)
 	struct minstrel_sta_info *mi = priv_sta;
 
 	debugfs_remove(mi->dbg_stats);
+	debugfs_remove(mi->dbg_hist);
 }
