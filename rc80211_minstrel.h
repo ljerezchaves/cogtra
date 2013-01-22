@@ -9,7 +9,7 @@
 #ifndef __RC_MINSTREL_H
 #define __RC_MINSTREL_H
 
-#define MINSTREL_DEBUGFS_HIST_SIZE	1000U
+#define MINSTREL_DEBUGFS_HIST_SIZE	10000U
 
 struct minstrel_rate {
 	int bitrate;
@@ -101,8 +101,9 @@ struct minstrel_priv {
 
 struct minstrel_hist_info {
 	int start_ms;
-	int rate;
-	bool lookaround;
+	int rate0;
+    int rate1;
+	int sample;
 };
 
 struct minstrel_debugfs_info {

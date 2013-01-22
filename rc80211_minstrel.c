@@ -307,18 +307,6 @@ minstrel_get_rate(void *priv, struct ieee80211_sta *sta,
 	ar[0].idx = mi->r[ndx].rix;
 	ar[0].count = minstrel_get_retry_count(&mi->r[ndx], info);
 
-#ifdef CONFIG_MAC80211_DEBUGFS
-	if (mi->dbg_idx < MINSTREL_DEBUGFS_HIST_SIZE) {
-		struct minstrel_hist_info *ht = &mi->hi[mi->dbg_idx];
-
-		unsigned long diff = (long)jiffies - (long)mi->first_time;
-		ht->start_ms = (int)(diff * 1000 / HZ);
-		ht->rate = mi->r[ndx].bitrate;
-		ht->lookaround = sample;
-		mi->dbg_idx++;
-	}
-#endif
-
 	if (!mrr) {
 		if (!sample)
 			ar[0].count = mp->max_retry;
@@ -342,6 +330,24 @@ minstrel_get_rate(void *priv, struct ieee80211_sta *sta,
 		ar[i].idx = mi->r[mrr_ndx[i - 1]].rix;
 		ar[i].count = mi->r[mrr_ndx[i - 1]].adjusted_retry_count;
 	}
+
+#ifdef CONFIG_MAC80211_DEBUGFS
+	if (mi->dbg_idx < MINSTREL_DEBUGFS_HIST_SIZE) {
+        struct minstrel_hist_info *ht = &mi->hi[mi->dbg_idx];
+        struct minstrel_hist_info *hl = &mi->hi[mi->dbg_idx-1];
+        int r0 = mi->r[rix_to_ndx(mi, ar[0].idx)].bitrate;
+
+        if (hl->rate0 != r0) {
+            unsigned long diff = (long)jiffies - (long)mi->first_time;
+		    ht->start_ms = (int)(diff * 1000 / HZ);
+		    ht->rate0 = r0;
+		    ht->rate1 = mi->r[rix_to_ndx(mi, ar[1].idx)].bitrate;
+		    ht->sample = sample ? (sample_slower ? -1 : 1) : 0;
+            mi->dbg_idx++;
+        }
+	}
+#endif
+
 }
 
 
@@ -492,6 +498,7 @@ minstrel_alloc_sta(void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 
 	mi->stats_update = jiffies;
 	mi->first_time = jiffies;
+    mi->dbg_idx = 1;
 	return mi;
 
 error2:

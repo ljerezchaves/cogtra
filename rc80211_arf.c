@@ -48,11 +48,11 @@
 #include <linux/slab.h>
 #include <net/mac80211.h>
 #include "rate.h"
-#include "rc80211_aarf.h"
+#include "rc80211_arf.h"
 
 /* Converting mac80211 rate index into local array index */
 static inline int
-rix_to_ndx (struct aarf_sta_info *ci, int rix)
+rix_to_ndx (struct arf_sta_info *ci, int rix)
 {
 	int i;
 	for (i = ci->n_rates - 1; i >= 0; i--)
