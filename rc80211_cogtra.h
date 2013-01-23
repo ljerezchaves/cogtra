@@ -37,7 +37,7 @@
 #define COGTRA_USE_ISA
 #define COGTRA_USE_MRR
 
-#define COGTRA_DEBUGFS_HIST_SIZE	1000U
+#define COGTRA_DEBUGFS_HIST_SIZE	10000U
 
 struct chain_table {
 	unsigned int type;

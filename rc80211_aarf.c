@@ -157,15 +157,14 @@ static void aarf_att_failure (struct aarf_sta_info *ci, int rate)
 		if (ci->current_rate_ndx > 0)
 			ci->current_rate_ndx--;
 	}
-	else if (ci->failures >= 2)
+	else if (ci->failures >= 2 && ci->current_rate_ndx > 0)
 	{
 		aarf_log (ci, AARF_LOG_FAILURE, ci->current_rate_ndx-1 < 0 ? 0 : ci->current_rate_ndx-1, ci->current_rate_ndx);
 		ci->timer = 0;
 		ci->failures = 0;
 		ci->timeout = ci->min_timeout;
 		ci->success_thrs = ci->min_succ_thrs;
-		if (ci->current_rate_ndx > 0)
-			ci->current_rate_ndx--;
+		ci->current_rate_ndx--;
 	}
 }
 
