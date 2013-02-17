@@ -52,6 +52,74 @@
 #include "rc80211_cogtra.h"
 #include "rc80211_cogtra_ht.h"
 
+
+#define AVG_PKT_SIZE	1200
+
+/* Number of bits for an average sized packet */
+#define MCS_NBITS (AVG_PKT_SIZE << 3)
+
+/* Number of symbols for a packet with (bps) bits per symbol */
+#define MCS_NSYMS(bps) ((MCS_NBITS + (bps) - 1) / (bps))
+
+/* Transmission time for a packet containing (syms) symbols */
+#define MCS_SYMBOL_TIME(sgi, syms)					\
+	(sgi ?								\
+	  ((syms) * 18 + 4) / 5 :	/* syms * 3.6 us */		\
+	  (syms) << 2			/* syms * 4 us */		\
+	)
+
+/* Transmit duration for the raw data part of an average sized packet */
+#define MCS_DURATION(streams, sgi, bps) MCS_SYMBOL_TIME(sgi, MCS_NSYMS((streams) * (bps)))
+
+/* MCS rate information for an MCS group */
+#define MCS_GROUP(_streams, _sgi, _ht40) {				\
+	.streams = _streams,						\
+	.flags =							\
+		(_sgi ? IEEE80211_TX_RC_SHORT_GI : 0) |			\
+		(_ht40 ? IEEE80211_TX_RC_40_MHZ_WIDTH : 0),		\
+	.duration = {							\
+		MCS_DURATION(_streams, _sgi, _ht40 ? 54 : 26),		\
+		MCS_DURATION(_streams, _sgi, _ht40 ? 108 : 52),		\
+		MCS_DURATION(_streams, _sgi, _ht40 ? 162 : 78),		\
+		MCS_DURATION(_streams, _sgi, _ht40 ? 216 : 104),	\
+		MCS_DURATION(_streams, _sgi, _ht40 ? 324 : 156),	\
+		MCS_DURATION(_streams, _sgi, _ht40 ? 432 : 208),	\
+		MCS_DURATION(_streams, _sgi, _ht40 ? 486 : 234),	\
+		MCS_DURATION(_streams, _sgi, _ht40 ? 540 : 260)		\
+	}								\
+}
+
+/*
+ * To enable sufficiently targeted rate sampling, MCS rates are divided into
+ * groups, based on the number of streams and flags (HT40, SGI) that they
+ * use.
+ */
+const struct mcs_group minstrel_mcs_groups[] = {
+	MCS_GROUP(1, 0, 0),
+	MCS_GROUP(2, 0, 0),
+#if MINSTREL_MAX_STREAMS >= 3
+	MCS_GROUP(3, 0, 0),
+#endif
+
+	MCS_GROUP(1, 1, 0),
+	MCS_GROUP(2, 1, 0),
+#if MINSTREL_MAX_STREAMS >= 3
+	MCS_GROUP(3, 1, 0),
+#endif
+
+	MCS_GROUP(1, 0, 1),
+	MCS_GROUP(2, 0, 1),
+#if MINSTREL_MAX_STREAMS >= 3
+	MCS_GROUP(3, 0, 1),
+#endif
+
+	MCS_GROUP(1, 1, 1),
+	MCS_GROUP(2, 1, 1),
+#if MINSTREL_MAX_STREAMS >= 3
+	MCS_GROUP(3, 1, 1),
+#endif
+};
+
 static inline int
 cogtra_ht_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp, 
 		u32 curr_thp, unsigned int stdev)
@@ -59,7 +127,8 @@ cogtra_ht_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp,
 	/* Check for more than 10% thp variation */
 	s32 delta = (s32)(last_thp / 10);
 	s32 diff = (s32)(curr_thp - last_thp);
-
+	
+	printk("HR: _aaa\n");
 	if (abs (diff) > delta)
 		return min (stdev + 10, (unsigned int) COGTRA_HT_MAX_STDEV);
 	else
@@ -76,6 +145,7 @@ rc80211_cogtra_ht_normal_generator (int mean, int stdev_times100)
 	int round_fac = 0;
 	unsigned int i = 0;
 
+	printk("HR: _normal_generator\n");
 	/* Convolution method to generate random normal numbers
 	 * Refer to "Raj Jain", "The art of computer systems performance analysis",
 	 * 1 edition, page 494.
@@ -186,6 +256,7 @@ static inline int
 rix_to_ndx (struct cogtra_ht_sta *ci, int rix)
 {
 	int i;
+	printk("HR: _rix_to_ndx\n");
 	for (i = ci->n_rates - 1; i >= 0; i--)
 		if (ci->r[i].rix == rix)
 			break;
@@ -200,6 +271,7 @@ sort_bitrates (struct cogtra_ht_sta *ci, int n_rates)
 	int i, j;
 	struct cogtra_rate cr_key;
 
+	printk("HR: _sort_bitrates\n");
 	/* Insertion sort */
 	for (j = 1; j < n_rates; j++) {	
 		cr_key = ci->r[j];
@@ -220,6 +292,7 @@ static void
 cogtra_ht_mrr_populate (struct cogtra_ht_sta *ci)
 {
 	struct chain_table *ct = ci->t;
+	printk("HR: _mrr_populate\n");
 	memset (ct, 0, 4 * sizeof (*ct));
 	
 	/* Random COGTRA_HT rate */
@@ -261,7 +334,8 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 	unsigned int old_stdev, old_mean;
 	u32 old_thp, new_thp;
 	int random = 0;
-
+	
+	printk("HR: _update_stats\n");
 	ci->up_stats_counter++;
 
 	old_stdev = ci->cur_stdev;
@@ -358,9 +432,12 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	int i, ndx;
 	int success;
  
-	if(!csp->is_ht)
+	printk("HR: _tx_status");
+	if(!csp->is_ht){
+		printk(" -> Legacy\n");
 		return mac80211_cogtra.tx_status(priv,sband, sta, &csp->legacy,skb);
-
+	}
+	printk(" -> HT\n");
  	/* Checking for a success in frame transmission */
 	success = !!(info->flags & IEEE80211_TX_STAT_ACK);
 
@@ -406,20 +483,27 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	bool mrr;
 	int i;
 
+	
 	/* Check for management or control packet, which should be transmitted
 	 * unsing lower rate */
 	if (rate_control_send_low (sta, priv_sta, txrc))
 		return;
 
-	if(!csp->is_ht)
+	printk ("HR: _get_rate");
+	if(!csp->is_ht){
+		printk(" -> Legacy\n");
 		return mac80211_cogtra.get_rate(priv, sta, &csp->legacy, txrc);
-
+	}
+	printk(" -> HT\n");
 	/* Check MRR hardware support */
 	mrr = cp->has_mrr && !txrc->rts && !txrc->bss_conf->use_cts_prot;
 
+	printk("\tmrr = cp->has_mrr && !txrc->rts && !txrc->bss_conf->use_cts_prot; \n");
 	/* Check the need of an update_stats based on update_interval */
 	if (ci->update_counter >= ci->update_interval)
 		cogtra_ht_update_stats (cp, ci);
+	
+	printk("\tif (ci->update_counter >= ci->update_interval) cogtra_ht_update_stats (cp, ci); \n");
 
 	/* Setting up tx rate information.
 	 * Be careful to convert ndx indexes into ieee80211_tx_rate indexes */
@@ -437,6 +521,7 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 		ar[i].idx = ci->t[i].rix;
 		ar[i].count = ci->t[i].count;
 	}
+	printk("\tEND \n");
 }
 
 
@@ -447,7 +532,7 @@ calc_rate_durations (struct ieee80211_local *local, struct cogtra_rate *cr,
 		struct ieee80211_rate *rate)
 {
 	int erp = !!(rate->flags & IEEE80211_RATE_ERP_G);
-
+	printk("HR: _rate_durations\n");
 	cr->perfect_tx_time = ieee80211_frame_duration (local, 1200, 
 			rate->bitrate, erp, 1);
 	cr->ack_time = ieee80211_frame_duration (local, 10, 
@@ -465,22 +550,91 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 	struct cogtra_ht_sta_priv *csp = priv_sta;
 	struct cogtra_priv *cp = priv;
 	struct cogtra_ht_sta *ci = &csp->ht;
-	//struct ieee80211_mcs_info *mcs = &sta->ht_cap.mcs;
+	struct ieee80211_mcs_info *mcs = &sta->ht_cap.mcs;
 	struct ieee80211_local *local = hw_to_local(cp->hw);
 	struct ieee80211_rate *ctl_rate;
-	//u16 sta_cap = sta->ht_cap.cap;
+	u16 sta_cap = sta->ht_cap.cap;
 	unsigned int i, n = 0;
 
+	printk("HR: _update_caps()");
 	/* fall back to the old cogtra for legacy stations */
 	if(!sta->ht_cap.ht_supported){
+		printk(" -> Legacy\n");
 		csp->is_ht = false;
 		memset(&csp->legacy, 0, sizeof(csp->legacy));
 		csp->legacy.r = csp->r;
 		csp->legacy.t = csp->t;
 		return mac80211_cogtra.rate_init(priv,sband,sta,&csp->legacy);
 	}
+	printk(" -> HT\n");
+
 	csp->is_ht = true;
 	memset(ci,0,sizeof(*ci));
+	ci->r = csp->r;
+	ci->t = csp->t;
+	
+
+	//Print info: sband
+	printk("-------------------------------------\n");
+	printk("sband: #n_channels %d \n",sband->n_channels);
+	for (i = 0; i < sband->n_channels; i++) {
+		printk("sband: #channels->center_freq %d \n",sband->channels[i].center_freq);
+	}
+	printk("sband: #n_bitrate %d \n",sband->n_bitrates);
+	for (i = 0; i < sband->n_bitrates; i++) {
+		printk("sband: #bitrates->flags %d \n",sband->bitrates[i].flags);
+		printk("sband: #bitrates->bitrate %d \n",sband->bitrates[i].bitrate);
+		printk("sband: #bitrates->hw_value %d \n",sband->bitrates[i].hw_value);
+		printk("sband: #bitrates->hw_value_short %d \n",sband->bitrates[i].hw_value_short);
+	}
+	printk("sband: #ht_cap->cap %d \n",sband->ht_cap.cap);
+	printk("sband: #ht_cap->ht_supported %d \n",sband->ht_cap.ht_supported);
+	printk("sband: #ht_cap->ampdu_factor %d \n",sband->ht_cap.ampdu_factor);
+	printk("sband: #ht_cap->ampdu_density %d \n",sband->ht_cap.ampdu_density);
+	printk("sband: #ht_cap->mcs->rx_mask[0] %d \n",sband->ht_cap.mcs.rx_mask[0]);
+	printk("sband: #ht_cap->mcs->rx_mask[1] %d \n",sband->ht_cap.mcs.rx_mask[1]);
+	printk("sband: #ht_cap->mcs->rx_mask[2] %d \n",sband->ht_cap.mcs.rx_mask[2]);
+	printk("sband: #ht_cap->mcs->rx_mask[3] %d \n",sband->ht_cap.mcs.rx_mask[3]);
+	printk("sband: #ht_cap->mcs->rx_mask[4] %d \n",sband->ht_cap.mcs.rx_mask[4]);
+	printk("sband: #ht_cap->mcs->rx_mask[5] %d \n",sband->ht_cap.mcs.rx_mask[5]);
+	printk("sband: #ht_cap->mcs->rx_mask[6] %d \n",sband->ht_cap.mcs.rx_mask[6]);
+	printk("sband: #ht_cap->mcs->rx_mask[7] %d \n",sband->ht_cap.mcs.rx_mask[7]);
+	printk("sband: #ht_cap->mcs->rx_mask[8] %d \n",sband->ht_cap.mcs.rx_mask[8]);
+	printk("sband: #ht_cap->mcs->rx_mask[9] %d \n",sband->ht_cap.mcs.rx_mask[9]);
+	printk("sband: #ht_cap->mcs->rx_highest %d \n",sband->ht_cap.mcs.rx_highest);
+	printk("sband: #ht_cap->mcs->tx_params %d \n",sband->ht_cap.mcs.tx_params);
+	printk("sband: #ht_cap->mcs->reserved[0] %d \n",sband->ht_cap.mcs.reserved[0]);	
+	printk("sband: #ht_cap->mcs->reserved[1] %d \n",sband->ht_cap.mcs.reserved[1]);
+	printk("sband: #ht_cap->mcs->reserved[2] %d \n",sband->ht_cap.mcs.reserved[2]);
+	
+
+	//Print info: sta
+	printk("-------------------------------------\n");
+	printk("sta: #IEEE80211_NUM_BANDS %d \n",IEEE80211_NUM_BANDS);
+	for (i = 0; i < IEEE80211_NUM_BANDS; i++) {
+		printk("sta: supp_rates %d \n",sta->supp_rates[i]);
+	}
+	printk("sta: #ht_cap->cap %d \n",sta->ht_cap.cap);
+	printk("sta: #ht_cap->ht_supported %d \n",sta->ht_cap.ht_supported);
+	printk("sta: #ht_cap->ampdu_factor %d \n",sta->ht_cap.ampdu_factor);
+	printk("sta: #ht_cap->ampdu_density %d \n",sta->ht_cap.ampdu_density);
+	printk("sta: #ht_cap->mcs->rx_mask[0] %d \n",sta->ht_cap.mcs.rx_mask[0]);
+	printk("sta: #ht_cap->mcs->rx_mask[1] %d \n",sta->ht_cap.mcs.rx_mask[1]);
+	printk("sta: #ht_cap->mcs->rx_mask[2] %d \n",sta->ht_cap.mcs.rx_mask[2]);
+	printk("sta: #ht_cap->mcs->rx_mask[3] %d \n",sta->ht_cap.mcs.rx_mask[3]);
+	printk("sta: #ht_cap->mcs->rx_mask[4] %d \n",sta->ht_cap.mcs.rx_mask[4]);
+	printk("sta: #ht_cap->mcs->rx_mask[5] %d \n",sta->ht_cap.mcs.rx_mask[5]);
+	printk("sta: #ht_cap->mcs->rx_mask[6] %d \n",sta->ht_cap.mcs.rx_mask[6]);
+	printk("sta: #ht_cap->mcs->rx_mask[7] %d \n",sta->ht_cap.mcs.rx_mask[7]);
+	printk("sta: #ht_cap->mcs->rx_mask[8] %d \n",sta->ht_cap.mcs.rx_mask[8]);
+	printk("sta: #ht_cap->mcs->rx_mask[9] %d \n",sta->ht_cap.mcs.rx_mask[9]);
+	printk("sta: #ht_cap->mcs->rx_highest %d \n",sta->ht_cap.mcs.rx_highest);
+	printk("sta: #ht_cap->mcs->tx_params %d \n",sta->ht_cap.mcs.tx_params);
+	printk("sta: #ht_cap->mcs->reserved[0] %d \n",sta->ht_cap.mcs.reserved[0]);	
+	printk("sta: #ht_cap->mcs->reserved[1] %d \n",sta->ht_cap.mcs.reserved[1]);
+	printk("sta: #ht_cap->mcs->reserved[2] %d \n",sta->ht_cap.mcs.reserved[2]);	
+	printk("-------------------------------------\n");
+	
 
 	/* Get the lowest index rate and calculate the duration of a ack tx */
 	ci->lowest_rix = rate_lowest_index (sband, sta);
@@ -500,12 +654,14 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 		/* Set index, bitrate and tx duration */
 		cr->rix = i;
 		cr->bitrate = sband->bitrates[i].bitrate / 5;
+		
 		calc_rate_durations (local, cr, &sband->bitrates[i]);
 	}
 
 	/* Sort rates based on bitrate */
 	sort_bitrates (ci, n);
 
+	printk("HR: _update_caps() # n_bitrates %d \n",sband->n_bitrates);
 	/* Mark unsupported rates with rix = -1 */
 	for (i = n; i < sband->n_bitrates; i++)
 		ci->r[i].rix = -1;
@@ -523,6 +679,7 @@ cogtra_ht_rate_init (void *priv, struct ieee80211_supported_band *sband,
 		struct ieee80211_sta *sta, void *priv_sta)
 {
 	struct cogtra_priv *cp = priv;
+	printk("HR: _rate_init()\n");
 	cogtra_ht_update_caps(priv, sband, sta, priv_sta, cp->hw->conf.channel_type);
 }
 
@@ -531,6 +688,7 @@ cogtra_ht_rate_update (void *priv, struct ieee80211_supported_band *sband,
 		struct ieee80211_sta *sta, void *priv_sta,
 		u32 changed, enum nl80211_channel_type oper_chan_type)
 {
+	printk("HR: _rate_update()\n");
 	cogtra_ht_update_caps(priv, sband, sta, priv_sta, oper_chan_type);
 }
 
@@ -545,6 +703,7 @@ cogtra_ht_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 	int max_rates = 0;
 	int i;
 
+	printk("HR: _alloc_sta()\n");
 	/*O minstrel_ht um mintrel_ht_sta */
 	csp = kzalloc (sizeof (struct cogtra_ht_sta_priv), gfp);
 	if (!csp)
@@ -587,6 +746,7 @@ cogtra_ht_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 {
 	struct cogtra_ht_sta_priv *csp = priv_sta;
 
+	printk("HR: _free_sta()\n");
 	kfree (csp->t);
 	kfree (csp->r);
 	kfree (csp);
@@ -597,6 +757,7 @@ cogtra_ht_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 static void *
 cogtra_ht_alloc (struct ieee80211_hw *hw, struct dentry *debugfsdir)
 {
+	printk("HR: _alloc()\n");
 	return mac80211_cogtra.alloc(hw, debugfsdir);
 }
 
@@ -627,7 +788,11 @@ struct rate_control_ops mac80211_cogtra_ht = {
 int __init
 rc80211_cogtra_ht_init(void)
 {
+	int i;
 	printk ("LJC CogTRA_HT algorithm.\n");
+	for(i=0;i<ARRAY_SIZE(minstrel_mcs_groups);i++){
+		printk("%d - Streams - %d\n", i, minstrel_mcs_groups->streams);
+	}
 	return ieee80211_rate_control_register (&mac80211_cogtra_ht);
 }
 

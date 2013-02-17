@@ -13,6 +13,14 @@
 #ifndef __RC_COGTRA_HT_H
 #define __RC_COGTRA_HT_H
 
+/*
+ * The number of streams can be changed to 2 to reduce code
+ * size and memory footprint.
+ */
+#define MINSTREL_MAX_STREAMS	3
+#define MINSTREL_STREAM_GROUPS	4
+#define MCS_GROUP_RATES	8
+
 /* Cogtra_HT custom code optimization */
 #define COGTRA_HT_MAX_STDEV			150
 #define COGTRA_HT_MIN_STDEV			40
@@ -23,6 +31,13 @@
 extern struct chain_table;
 extern struct cogtra_rate;
 
+struct mcs_group {
+	u32 flags;
+	int streams;
+	unsigned int duration[MCS_GROUP_RATES];
+};
+
+extern const struct mcs_group minstrel_mcs_groups[];
 
 struct cogtra_ht_sta{
 	unsigned int cur_stdev;			// current normal stdev
