@@ -441,6 +441,7 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
  	/* Checking for a success in frame transmission */
 	success = !!(info->flags & IEEE80211_TX_STAT_ACK);
 
+	printk("Using %d\n",ar[0].idx);
 	/* Updating information for each used rate */
 	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
 	
@@ -449,6 +450,7 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 			break;
 
 		/* Getting the local idx for this ieee80211_tx_rate */
+		
 		ndx = rix_to_ndx (ci, ar[i].idx);
 		if (ndx < 0)
 			continue;
@@ -482,7 +484,6 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	struct ieee80211_tx_rate *ar = info->control.rates;
 	bool mrr;
 	int i;
-
 	
 	/* Check for management or control packet, which should be transmitted
 	 * unsing lower rate */
@@ -498,19 +499,20 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	/* Check MRR hardware support */
 	mrr = cp->has_mrr && !txrc->rts && !txrc->bss_conf->use_cts_prot;
 
-	printk("\tmrr = cp->has_mrr && !txrc->rts && !txrc->bss_conf->use_cts_prot; \n");
+	
 	/* Check the need of an update_stats based on update_interval */
 	if (ci->update_counter >= ci->update_interval)
 		cogtra_ht_update_stats (cp, ci);
 	
-	printk("\tif (ci->update_counter >= ci->update_interval) cogtra_ht_update_stats (cp, ci); \n");
-
+	
 	/* Setting up tx rate information.
 	 * Be careful to convert ndx indexes into ieee80211_tx_rate indexes */
 
+		
 	if (!mrr) {
 		ar[0].idx = ci->r[ci->random_rate_ndx].rix;
 		ar[0].count = cp->max_retry;
+		ar[0].flags |= IEEE80211_TX_RC_MCS;
 		ar[1].idx = -1;
 		ar[1].count = 0;
 		return;
@@ -520,21 +522,32 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	for (i = 0; i < 4; i++) {
 		ar[i].idx = ci->t[i].rix;
 		ar[i].count = ci->t[i].count;
+		ar[i].flags |= IEEE80211_TX_RC_MCS;
 	}
-	printk("\tEND \n");
 }
 
+static inline int
+minstrel_get_duration(int index)
+{
+	const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
+	return group->duration[index % MCS_GROUP_RATES];
+}
 
-/* calc_rate_durations estimates the tx time for a single data frame of 1200
- * bytes and for an ack frame of standard size for a specific rate */
+/* Preenche cara cr com perfect_tc_time e ack_time
+*  Feito somente na hora de inicializacao
+*/
 static void
-calc_rate_durations (struct ieee80211_local *local, struct cogtra_rate *cr,
+calc_rate_durations (struct ieee80211_local *local, struct cogtra_rate *cr, 
 		struct ieee80211_rate *rate)
 {
 	int erp = !!(rate->flags & IEEE80211_RATE_ERP_G);
 	printk("HR: _rate_durations\n");
+	//cr->perfect_tx_time = minstrel_get_duration(cr->rix);
 	cr->perfect_tx_time = ieee80211_frame_duration (local, 1200, 
 			rate->bitrate, erp, 1);
+	printk("idx:%d -> leg:%d -> ht:%d\n",cr->rix,ieee80211_frame_duration (local, 1200, 
+			rate->bitrate, erp, 1), minstrel_get_duration(cr->rix));
+	
 	cr->ack_time = ieee80211_frame_duration (local, 10, 
 			rate->bitrate, erp, 1);
 }
@@ -575,7 +588,7 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 	
 
 	//Print info: sband
-	printk("-------------------------------------\n");
+	/*printk("-------------------------------------\n");
 	printk("sband: #n_channels %d \n",sband->n_channels);
 	for (i = 0; i < sband->n_channels; i++) {
 		printk("sband: #channels->center_freq %d \n",sband->channels[i].center_freq);
@@ -634,7 +647,7 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 	printk("sta: #ht_cap->mcs->reserved[1] %d \n",sta->ht_cap.mcs.reserved[1]);
 	printk("sta: #ht_cap->mcs->reserved[2] %d \n",sta->ht_cap.mcs.reserved[2]);	
 	printk("-------------------------------------\n");
-	
+	*/
 
 	/* Get the lowest index rate and calculate the duration of a ack tx */
 	ci->lowest_rix = rate_lowest_index (sband, sta);
@@ -661,7 +674,6 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 	/* Sort rates based on bitrate */
 	sort_bitrates (ci, n);
 
-	printk("HR: _update_caps() # n_bitrates %d \n",sband->n_bitrates);
 	/* Mark unsupported rates with rix = -1 */
 	for (i = n; i < sband->n_bitrates; i++)
 		ci->r[i].rix = -1;
@@ -704,7 +716,6 @@ cogtra_ht_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 	int i;
 
 	printk("HR: _alloc_sta()\n");
-	/*O minstrel_ht um mintrel_ht_sta */
 	csp = kzalloc (sizeof (struct cogtra_ht_sta_priv), gfp);
 	if (!csp)
 		return NULL;
@@ -790,9 +801,6 @@ rc80211_cogtra_ht_init(void)
 {
 	int i;
 	printk ("LJC CogTRA_HT algorithm.\n");
-	for(i=0;i<ARRAY_SIZE(minstrel_mcs_groups);i++){
-		printk("%d - Streams - %d\n", i, minstrel_mcs_groups->streams);
-	}
 	return ieee80211_rate_control_register (&mac80211_cogtra_ht);
 }
 

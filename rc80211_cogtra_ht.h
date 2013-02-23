@@ -39,7 +39,49 @@ struct mcs_group {
 
 extern const struct mcs_group minstrel_mcs_groups[];
 
+
+struct minstrel_rate_stats {
+	/* current / last sampling period attempts/success counters */
+	unsigned int attempts, last_attempts;
+	unsigned int success, last_success;
+
+	/* total attempts/success counters */
+	u64 att_hist, succ_hist;
+
+	/* current throughput */
+	unsigned int cur_tp;
+
+	/* packet delivery probabilities */
+	unsigned int cur_prob, probability;
+
+	/* maximum retry counts */
+	unsigned int retry_count;
+	unsigned int retry_count_rtscts;
+
+	bool retry_updated;
+	u8 sample_skipped;
+};
+
+struct minstrel_mcs_group_data {
+	u8 index;
+	u8 column;
+
+	/* bitfield of supported MCS rates of this group */
+	u8 supported;
+
+	/* selected primary rates */
+	unsigned int max_tp_rate;
+	unsigned int max_tp_rate2;
+	unsigned int max_prob_rate;
+
+	/* MCS rate statistics */
+	struct minstrel_rate_stats rates[MCS_GROUP_RATES];
+};
+
 struct cogtra_ht_sta{
+
+	struct ieee80211_tx_rate tx_rates[3];
+
 	unsigned int cur_stdev;			// current normal stdev
 	unsigned int max_tp_rate_ndx;		// index of rate with highest thp (current normal mean)
 	unsigned int max_prob_rate_ndx;		// index of rate with highest probability
@@ -52,6 +94,10 @@ struct cogtra_ht_sta{
 	
 	struct cogtra_rate *r;				// rate pointer for each station
 	struct chain_table *t;				// chain table pointer for mrr
+
+	/* MCS rate group info and statistics */
+	struct minstrel_mcs_group_data groups[MINSTREL_MAX_STREAMS * MINSTREL_STREAM_GROUPS];
+
 
 #ifdef CONFIG_MAC80211_DEBUGFS
 	struct dentry *dbg_stats;		// debug file pointer 
