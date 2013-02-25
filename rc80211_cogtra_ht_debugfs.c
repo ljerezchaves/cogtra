@@ -64,7 +64,7 @@ cogtra_ht_stats_open (struct inode *inode, struct file *file)
 	struct cogtra_ht_sta_priv *csp = inode->i_private;
 	struct cogtra_ht_sta *ci = &csp->ht;
 	struct cogtra_debugfs_info *cs;
-	unsigned int i, avg_tp, avg_prob, cur_tp, cur_prob;
+	unsigned int i, j, avg_tp, avg_prob, cur_tp, cur_prob;
 	char *p;
 	int ret;
 	
@@ -84,30 +84,44 @@ cogtra_ht_stats_open (struct inode *inode, struct file *file)
 
 	/* Table header */
 	p += sprintf(p, "\n Rate Table:\n");
-	p += sprintf(p, "    | rate | avg_thp | avg_pro | cur_thp | cur_pro | "
+	p += sprintf(p, "             MCS  | avg_thp | avg_pro | cur_thp | cur_pro | "
 			"succ ( atte ) | success | attempts | #used \n");
 
-	/* Table lines */
-	for (i = 0; i < ci->n_rates; i++) {
-		struct cogtra_rate *cr = &ci->r[i];
+	for (i = 0; i < MINSTREL_MAX_STREAMS * MINSTREL_STREAM_GROUPS; i++) {
+		char htmode = '2';
+		char gimode = 'L';
 
-		/* Print T for the rate with highest throughput (the mean of normal
-		 * curve), P for the rate with hisgest delivery probability and print *
-		 * for the rate been used now */
-		*(p++) = (i == ci->random_rate_ndx)		? '*' : ' ';
-		*(p++) = (i == ci->max_tp_rate_ndx) 	? 'T' : ' ';   
-		*(p++) = (i == ci->max_prob_rate_ndx) 	? 'P' : ' ';   
+		if (!ci->groups[i].supported)
+			continue;
 
-		p += sprintf(p, " |%3u%s ", cr->bitrate / 2,
-				(cr->bitrate & 1 ? ".5" : "  "));
+		if (minstrel_mcs_groups[i].flags & IEEE80211_TX_RC_40_MHZ_WIDTH)
+			htmode = '4';
+		if (minstrel_mcs_groups[i].flags & IEEE80211_TX_RC_SHORT_GI)
+			gimode = 'S';
 
-		/* Converting the internal thp and prob format */
-		avg_tp = cr->avg_tp / ((1800 << 10) / 96);
-		cur_tp = cr->cur_tp / ((1800 << 10) / 96);
-		avg_prob = cr->avg_prob;
-		cur_prob = cr->cur_prob;
+		for (j = 0; j < MCS_GROUP_RATES; j++) {
+			struct minstrel_rate_stats *cr = &ci->groups[i].rates[j];
+			int idx = i * MCS_GROUP_RATES + j;
 
-		p += sprintf (
+			if (!(ci->groups[i].supported & BIT(j)))
+				continue;
+
+			p += sprintf(p, "HT%c0/%cGI ", htmode, gimode);
+
+			*(p++) = (idx == ci->random_rate_ndx)		? '*' : ' ';
+			*(p++) = (idx == ci->max_tp_rate_ndx) 	? 'T' : ' ';   
+			*(p++) = (idx == ci->max_prob_rate_ndx) 	? 'P' : ' ';  
+
+			p += sprintf(p, " MCS%-2u", (minstrel_mcs_groups[i].streams - 1) *
+					MCS_GROUP_RATES + j);
+		
+			/* Converting the internal thp and prob format */
+			avg_tp = cr->avg_tp / ((1800 << 10) / 96);
+			cur_tp = cr->cur_tp / ((1800 << 10) / 96);
+			avg_prob = cr->avg_prob;
+			cur_prob = cr->cur_prob;
+
+			p += sprintf (
 				p, 
 				"| %5u.%1u | %7u | %5u.%1u | %7u "
 				"| %4u ( %4u ) | %7llu | %8llu | %5u\n",
@@ -120,24 +134,17 @@ cogtra_ht_stats_open (struct inode *inode, struct file *file)
 				(unsigned long long) cr->att_hist,
 				cr->times_called
 			);
+		}
 	}
+	
 
 	/* Chain table  */
-	p += sprintf(p, "\n MRR Chain Table:\n");
-	p += sprintf(p, " type |  rate | count | success | attempts \n");
+	p += sprintf(p, "\n MRR Tx_Rate Table:\n");
+	p += sprintf(p, " idx \n");
 
 	for (i = 0; i < 4; i++) {
-		struct chain_table *ct = &ci->t[i];
-
-		p += sprintf (
-			p, 
-			" %s | %3u%s | %5u | %7llu | %8llu\n",
-			ct->type == 0 ? "rand": ct->type == 1 ? "best" : ct->type == 2 ? "prob" : "lowr", 
-			ct->bitrate / 2, (ct->bitrate & 1 ? ".5" : "  "),
-			ct->count,
-			(unsigned long long) ct->suc,
-			(unsigned long long) ct->att
-		);
+		struct ieee80211_tx_rate *tx = &ci->tx_rates[i];
+		p += sprintf (p, " %u\n",tx->idx);
 	}
 
 	/* Table footer */

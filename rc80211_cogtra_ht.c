@@ -40,6 +40,7 @@
  *   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  *   THE POSSIBILITY OF SUCH DAMAGES.
  */
+
 #include <linux/netdevice.h>
 #include <linux/types.h>
 #include <linux/skbuff.h>
@@ -62,32 +63,33 @@
 #define MCS_NSYMS(bps) ((MCS_NBITS + (bps) - 1) / (bps))
 
 /* Transmission time for a packet containing (syms) symbols */
-#define MCS_SYMBOL_TIME(sgi, syms)					\
-	(sgi ?								\
-	  ((syms) * 18 + 4) / 5 :	/* syms * 3.6 us */		\
-	  (syms) << 2			/* syms * 4 us */		\
-	)
+#define MCS_SYMBOL_TIME(sgi, syms)                                      \
+        (sgi ?                                                          \
+          ((syms) * 18 + 4) / 5 :       /* syms * 3.6 us */             \
+          (syms) << 2                   /* syms * 4 us */               \
+        )
 
 /* Transmit duration for the raw data part of an average sized packet */
 #define MCS_DURATION(streams, sgi, bps) MCS_SYMBOL_TIME(sgi, MCS_NSYMS((streams) * (bps)))
 
 /* MCS rate information for an MCS group */
-#define MCS_GROUP(_streams, _sgi, _ht40) {				\
-	.streams = _streams,						\
-	.flags =							\
-		(_sgi ? IEEE80211_TX_RC_SHORT_GI : 0) |			\
-		(_ht40 ? IEEE80211_TX_RC_40_MHZ_WIDTH : 0),		\
-	.duration = {							\
-		MCS_DURATION(_streams, _sgi, _ht40 ? 54 : 26),		\
-		MCS_DURATION(_streams, _sgi, _ht40 ? 108 : 52),		\
-		MCS_DURATION(_streams, _sgi, _ht40 ? 162 : 78),		\
-		MCS_DURATION(_streams, _sgi, _ht40 ? 216 : 104),	\
-		MCS_DURATION(_streams, _sgi, _ht40 ? 324 : 156),	\
-		MCS_DURATION(_streams, _sgi, _ht40 ? 432 : 208),	\
-		MCS_DURATION(_streams, _sgi, _ht40 ? 486 : 234),	\
-		MCS_DURATION(_streams, _sgi, _ht40 ? 540 : 260)		\
-	}								\
+#define MCS_GROUP(_streams, _sgi, _ht40) {                              \
+        .streams = _streams,                                            \
+        .flags =                                                        \
+                (_sgi ? IEEE80211_TX_RC_SHORT_GI : 0) |                 \
+                (_ht40 ? IEEE80211_TX_RC_40_MHZ_WIDTH : 0),             \
+        .duration = {                                                   \
+                MCS_DURATION(_streams, _sgi, _ht40 ? 54 : 26),          \
+                MCS_DURATION(_streams, _sgi, _ht40 ? 108 : 52),         \
+                MCS_DURATION(_streams, _sgi, _ht40 ? 162 : 78),         \
+                MCS_DURATION(_streams, _sgi, _ht40 ? 216 : 104),        \
+                MCS_DURATION(_streams, _sgi, _ht40 ? 324 : 156),        \
+                MCS_DURATION(_streams, _sgi, _ht40 ? 432 : 208),        \
+                MCS_DURATION(_streams, _sgi, _ht40 ? 486 : 234),        \
+                MCS_DURATION(_streams, _sgi, _ht40 ? 540 : 260)         \
+        }                                                               \
 }
+
 
 /*
  * To enable sufficiently targeted rate sampling, MCS rates are divided into
@@ -250,76 +252,30 @@ rc80211_cogtra_ht_normal_generator (int mean, int stdev_times100)
 	return (int)(mean + ((value - 1524) * stdev_times100)/(round_fac * 256));
 }
 
-
-/* Converting mac80211 rate index into local array index */
-static inline int
-rix_to_ndx (struct cogtra_ht_sta *ci, int rix)
-{
-	int i;
-	printk("HR: _rix_to_ndx\n");
-	for (i = ci->n_rates - 1; i >= 0; i--)
-		if (ci->r[i].rix == rix)
-			break;
-	return i;
+static inline int minstrel_get_duration(int index) {
+	const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
+	return group->duration[index % MCS_GROUP_RATES];
 }
 
-
-/* Sort rates by bitrates. Is called once by cogtra_ht_rate_init */
-static void
-sort_bitrates (struct cogtra_ht_sta *ci, int n_rates)
-{
-	int i, j;
-	struct cogtra_rate cr_key;
-
-	printk("HR: _sort_bitrates\n");
-	/* Insertion sort */
-	for (j = 1; j < n_rates; j++) {	
-		cr_key = ci->r[j];
-		i = j - 1;
-		
-		while ((i >= 0) && (ci->r[i].bitrate > cr_key.bitrate)) {
-			ci->r[i+1] = ci->r[i];
-			i--;
-		}
-		ci->r[i+1] = cr_key;
-	}
+static void cogtra_ht_set_rate(struct ieee80211_tx_rate *rate, int index){
+    	const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
+    	
+    	//rate->idx = index % MCS_GROUP_RATES + (group->streams - 1) * MCS_GROUP_RATES;
+	rate->idx = index;
+	rate->flags = IEEE80211_TX_RC_MCS | group->flags;
+	rate->count = 2U;
 }
 
-
-/* cogtra_ht_mrr_populate fill in the multirate retry chain in acordance with random
- * and best data rates*/
-static void
-cogtra_ht_mrr_populate (struct cogtra_ht_sta *ci)
-{
-	struct chain_table *ct = ci->t;
-	printk("HR: _mrr_populate\n");
-	memset (ct, 0, 4 * sizeof (*ct));
-	
-	/* Random COGTRA_HT rate */
-	ct[0].type = 0;
-	ct[0].rix = ci->r[ci->random_rate_ndx].rix;
-	ct[0].bitrate = ci->r[ci->random_rate_ndx].bitrate;
-	ct[0].count = 2U;
-
-	/* Best throughput */
-	ct[1].type = 1;
-	ct[1].rix = ci->r[ci->max_tp_rate_ndx].rix;
-	ct[1].bitrate = ci->r[ci->max_tp_rate_ndx].bitrate;
-	ct[1].count = 2U;
-
-	/* Best probability */
-	ct[2].type = 2;
-	ct[2].rix = ci->r[ci->max_prob_rate_ndx].rix;
-	ct[2].bitrate = ci->r[ci->max_prob_rate_ndx].bitrate;
-	ct[2].count = 2U; 
-
-	/* Lowest rate */
-	ct[3].type = 3;
-	ct[3].rix = ci->lowest_rix;
-	ct[3].bitrate = ci->r[0].bitrate;
-	ct[3].count = 2U;
+static void cogtra_ht_tx_rate_populate(struct cogtra_ht_sta *ci) {
+	cogtra_ht_set_rate(&ci->tx_rates[0], ci->random_rate_ndx);
+	cogtra_ht_set_rate(&ci->tx_rates[1], ci->max_tp_rate_ndx);
+	cogtra_ht_set_rate(&ci->tx_rates[2], ci->max_prob_rate_ndx);
+	cogtra_ht_set_rate(&ci->tx_rates[3], 0);
 }
 
+static inline struct minstrel_rate_stats * minstrel_get_ratestats(struct cogtra_ht_sta *ci, int index){
+        return &ci->groups[index / MCS_GROUP_RATES].rates[index % MCS_GROUP_RATES];
+}
 
 /* cogtra_ht_update_stats is called by cogtra_ht_get_rate when the update_interval
  * expires. It sumarizes statistics information and use cogtra_ht core algorithm to
@@ -327,94 +283,146 @@ cogtra_ht_mrr_populate (struct cogtra_ht_sta *ci)
 static void
 cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 {
-
+	struct minstrel_mcs_group_data *cg;
+    struct minstrel_rate_stats *cr;
+	
 	u32 usecs;
-	u32 max_tp = 0, max_prob = 0;
-	unsigned int i, max_tp_ndx, max_prob_ndx;
+	
+	unsigned int random_rate_gix, max_tp_rate_gix, max_prob_rate_gix;
+	unsigned int index, i, max_tp_ndx, max_prob_ndx, random_rt,max_tp_rate,max_prob_rate ;
+	
 	unsigned int old_stdev, old_mean;
 	u32 old_thp, new_thp;
+	
 	int random = 0;
+	int group;
 	
 	printk("HR: _update_stats\n");
 	ci->up_stats_counter++;
-
-	old_stdev = ci->cur_stdev;
-	old_mean = ci->max_tp_rate_ndx;
-	old_thp = ci->r[ci->random_rate_ndx].avg_tp;
+	
 
 	/* For each supported rate... */
-	for (i = 0; i < ci->n_rates; i++) {
-		struct cogtra_rate *cr = &ci->r[i];
+	for (group = 0; group < ARRAY_SIZE(minstrel_mcs_groups); group++) {
+		u32 max_tp = 0, max_prob, randon_rt = 0;
+				
+		cg = &ci->groups[group];
+		if (!cg->supported)
+			continue;
+		
+		old_stdev 	= cg->cur_stdev;
+		old_mean 	= cg->max_tp_rate;
+		old_thp 	= minstrel_get_ratestats(ci,ci->random_rate_ndx)->avg_tp;
+		
+		cg->random_rate = 0;
+		cg->max_tp_rate = 0;
+		cg->max_prob_rate = 0;
 
-		/* To avoid rounding issues, probabilities scale from 0 (0%)
-		 * to 1800 (100%) */
-		if (cr->attempts) {
+		for (i = 0; i < MCS_GROUP_RATES; i++) {
+			if (!(cg->supported & BIT(i)))
+			continue;
+			
+			cr = &cg->rates[i];
+			index = MCS_GROUP_RATES * group + i;
+			
+			/* To avoid rounding issues, probabilities scale from 0 (0%)
+			 * to 1800 (100%) */
+			if (cr->attempts) {
 
-			usecs = cr->perfect_tx_time;
-			if (!usecs)
-				usecs = 1000000;
+				usecs = minstrel_get_duration(index);
+				if (!usecs)
+					usecs = 1000000;
 
-			/* Update thp and prob for last interval */
-			cr->cur_prob = (cr->success * 1800) / cr->attempts;
-			cr->cur_tp = cr->cur_prob * (1000000 / usecs);
+				/* Update thp and prob for last interval */
+				cr->cur_prob 	= (cr->success * 1800) / cr->attempts;
+				cr->cur_tp 		= cr->cur_prob * (1000000 / usecs);
 
-			/* Update average thp and prob with EWMA */
-			cr->avg_prob = cr->avg_prob ? ((cr->cur_prob * (100 -
-					cp->ewma_level)) + (cr->avg_prob * cp->ewma_level)) / 100 :
-					cr->cur_prob;
-			cr->avg_tp = cr->avg_tp ? ((cr->cur_tp * (100 - cp->ewma_level)) +
-					(cr->avg_tp * cp->ewma_level)) / 100 : cr->cur_tp;
+				/* Update average thp and prob with EWMA */
+				cr->avg_prob = cr->avg_prob ? ((cr->cur_prob * (100 -
+						cp->ewma_level)) + (cr->avg_prob * cp->ewma_level)) / 100 :
+						cr->cur_prob;
+				cr->avg_tp = cr->avg_tp ? ((cr->cur_tp * (100 - cp->ewma_level)) +
+						(cr->avg_tp * cp->ewma_level)) / 100 : cr->cur_tp;
+
+				/* Update success and attempt counters */
+				cr->succ_hist += cr->success;
+				cr->att_hist += cr->attempts;
+			}
 
 			/* Update success and attempt counters */
-			cr->succ_hist += cr->success;
-			cr->att_hist += cr->attempts;
+			cr->last_success = cr->success;
+			cr->last_attempts = cr->attempts;
+			cr->success = 0;
+			cr->attempts = 0;
 		}
+		new_thp = cg->rates[cg->random_rate].avg_tp;
 
-		/* Update success and attempt counters */
-		cr->last_success = cr->success;
-		cr->last_attempts = cr->attempts;
-		cr->success = 0;
-		cr->attempts = 0;
-	}
-	new_thp = ci->r[ci->random_rate_ndx].avg_tp;
-
-	/* Look for the rate with highest throughput and probability */
-	for (i = 0; i < ci->n_rates; i++) {
-		struct cogtra_rate *cr = &ci->r[i];
-		if (max_tp < cr->avg_tp) {
-			max_tp_ndx = i;
-			max_tp = cr->avg_tp;
+		/* Look for the rate with highest throughput and probability */
+		for (i = 0; i < MCS_GROUP_RATES; i++) {
+			struct minstrel_rate_stats *cr = &cg->rates[i];
+			if (max_tp < cr->avg_tp) {
+				max_tp_ndx = i;
+				max_tp = cr->avg_tp;
+			}
+			if (max_prob < cr->avg_prob) {
+				max_prob_ndx = i;
+				max_prob = cr->avg_prob;
+			}
 		}
-		if (max_prob < cr->avg_prob) {
-			max_prob_ndx = i;
-			max_prob = cr->avg_prob;
-		}
-	}
-	ci->max_tp_rate_ndx = max_tp_ndx;
-	ci->max_prob_rate_ndx = max_prob_ndx;
-	ci->update_counter = 0UL;
-
-	/* Adjusting stdev with CogTRA_HT AAA */
-	ci->cur_stdev = cogtra_ht_aaa (old_mean, ci->max_tp_rate_ndx,
+		
+		cg->max_tp_rate = max_tp_ndx;
+		cg->max_prob_rate = max_prob_ndx;
+			
+		/* Adjusting stdev with CogTRA_HT AAA */
+		cg->cur_stdev = cogtra_ht_aaa (old_mean, cg->max_tp_rate,
 			old_thp, new_thp, old_stdev);
 
-	/* Get a new random rate for next interval (using a normal distribution) */
-	random = rc80211_cogtra_ht_normal_generator ((int)ci->max_tp_rate_ndx,
-			(int)ci->cur_stdev);
-	ci->random_rate_ndx = (unsigned int)(max (0, min (random,
-					(int)((int)(ci->n_rates) - 1))));
-	ci->r[ci->random_rate_ndx].times_called++;
+		/* Get a new random rate for next interval (using a normal distribution) */
+		random = rc80211_cogtra_ht_normal_generator ((int)cg->max_tp_rate,
+				(int)cg->cur_stdev);
+		cg->random_rate = (unsigned int)(max (0, min (random,
+						(int)((int)(MCS_GROUP_RATES) - 1))));
+		cg->rates[cg->random_rate].times_called++;
+		
+	}
+	
+	/* For each supported group... */
+	for (group = 0; group < ARRAY_SIZE(minstrel_mcs_groups); group++) {
+		random_rt = 0;
+		max_tp_rate = 0;
+		max_prob_rate = 0;	
 
-	cogtra_ht_mrr_populate (ci);
+		cg = &ci->groups[group];
+		if (!cg->supported)
+			continue;
+		
+		if (random_rt < cg->random_rate) {
+			random_rate_gix = i;
+			random_rt = cg->random_rate;
+		}
+		if (max_tp_rate < cg->max_tp_rate) {
+			max_tp_rate_gix = i;
+			max_tp_rate = cg->max_tp_rate;
+		}
+		if (max_prob_rate < cg->max_prob_rate) {
+			max_prob_rate_gix = i;
+			max_prob_rate = cg->max_prob_rate;
+		}	
+	}
+		ci->random_rate_ndx = (random_rate_gix * MCS_GROUP_RATES) + random_rt;
+		ci->max_tp_rate_ndx = (max_tp_rate_gix * MCS_GROUP_RATES) + max_tp_rate;
+		ci->max_prob_rate_ndx = (max_prob_rate_gix * MCS_GROUP_RATES) + max_prob_rate;
+		
+		cogtra_ht_tx_rate_populate (ci);
 
-	/* Adjust update_interval dependending on the random rate */
-	/* RANDOM < BEST || RANDOM.PROB < 10% */
-	if ((ci->r[ci->random_rate_ndx].perfect_tx_time >
-				ci->r[ci->max_tp_rate_ndx].perfect_tx_time) ||
-			(ci->r[ci->random_rate_ndx].avg_prob < 180)) 
-		ci->update_interval = COGTRA_HT_RECOVERY_INTERVAL;
-	else
-		ci->update_interval = COGTRA_HT_UPDATE_INTERVAL;
+		/* Adjust update_interval dependending on the random rate */
+		/* RANDOM < BEST || RANDOM.PROB < 10% */
+		/*if ((ci->rates[ci->random_rate_ndx].perfect_tx_time >
+					ci->rates[ci->max_tp_rate_ndx].perfect_tx_time) ||
+				(ci->rates[ci->random_rate_ndx].avg_prob < 180)) 
+			ci->update_interval = COGTRA_HT_RECOVERY_INTERVAL;
+		else
+			ci->update_interval = COGTRA_HT_UPDATE_INTERVAL;
+		}*/
 }
 
 
@@ -428,7 +436,6 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	struct cogtra_ht_sta *ci = &csp->ht;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_tx_rate *ar = info->status.rates;
-	struct chain_table *ct = ci->t;
 	int i, ndx;
 	int success;
  
@@ -451,20 +458,20 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 
 		/* Getting the local idx for this ieee80211_tx_rate */
 		
-		ndx = rix_to_ndx (ci, ar[i].idx);
+		ndx = ar[i].idx;
 		if (ndx < 0)
 			continue;
 
 		/* Increasing attempts counter */
-		ci->r[ndx].attempts += ar[i].count;
+		minstrel_get_ratestats(ci,ndx)->attempts += ar[i].count;
 		ci->update_counter += ar[i].count;
-		ct[i].att += ar[i].count;
+		//ct[i].att += ar[i].count;
 
 		/* If it is the last used rate and resultesd in tx success, also
 		 * increse the success counter */
 		if ((i != IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) {
-			ci->r[ndx].success += success;
-			ct[i].suc += success;
+			minstrel_get_ratestats(ci,ndx)->success += success;
+			//ct[i].suc += success;
 		}
 	}
 }
@@ -510,9 +517,7 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 
 		
 	if (!mrr) {
-		ar[0].idx = ci->r[ci->random_rate_ndx].rix;
-		ar[0].count = cp->max_retry;
-		ar[0].flags |= IEEE80211_TX_RC_MCS;
+		ar[0] = ci->tx_rates[0];
 		ar[1].idx = -1;
 		ar[1].count = 0;
 		return;
@@ -520,36 +525,8 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 
 	/* MRR setup */
 	for (i = 0; i < 4; i++) {
-		ar[i].idx = ci->t[i].rix;
-		ar[i].count = ci->t[i].count;
-		ar[i].flags |= IEEE80211_TX_RC_MCS;
+		ar[i] = ci->tx_rates[i];
 	}
-}
-
-static inline int
-minstrel_get_duration(int index)
-{
-	const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
-	return group->duration[index % MCS_GROUP_RATES];
-}
-
-/* Preenche cara cr com perfect_tc_time e ack_time
-*  Feito somente na hora de inicializacao
-*/
-static void
-calc_rate_durations (struct ieee80211_local *local, struct cogtra_rate *cr, 
-		struct ieee80211_rate *rate)
-{
-	int erp = !!(rate->flags & IEEE80211_RATE_ERP_G);
-	printk("HR: _rate_durations\n");
-	//cr->perfect_tx_time = minstrel_get_duration(cr->rix);
-	cr->perfect_tx_time = ieee80211_frame_duration (local, 1200, 
-			rate->bitrate, erp, 1);
-	printk("idx:%d -> leg:%d -> ht:%d\n",cr->rix,ieee80211_frame_duration (local, 1200, 
-			rate->bitrate, erp, 1), minstrel_get_duration(cr->rix));
-	
-	cr->ack_time = ieee80211_frame_duration (local, 10, 
-			rate->bitrate, erp, 1);
 }
 
 
@@ -565,9 +542,12 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 	struct cogtra_ht_sta *ci = &csp->ht;
 	struct ieee80211_mcs_info *mcs = &sta->ht_cap.mcs;
 	struct ieee80211_local *local = hw_to_local(cp->hw);
-	struct ieee80211_rate *ctl_rate;
+	struct ieee80211_rate *ctl_rate;//r
 	u16 sta_cap = sta->ht_cap.cap;
 	unsigned int i, n = 0;
+	int n_supported = 0;
+	int ack_dur;
+	int stbc;
 
 	printk("HR: _update_caps()");
 	/* fall back to the old cogtra for legacy stations */
@@ -583,107 +563,67 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 
 	csp->is_ht = true;
 	memset(ci,0,sizeof(*ci));
-	ci->r = csp->r;
-	ci->t = csp->t;
-	
 
-	//Print info: sband
-	/*printk("-------------------------------------\n");
-	printk("sband: #n_channels %d \n",sband->n_channels);
-	for (i = 0; i < sband->n_channels; i++) {
-		printk("sband: #channels->center_freq %d \n",sband->channels[i].center_freq);
-	}
-	printk("sband: #n_bitrate %d \n",sband->n_bitrates);
-	for (i = 0; i < sband->n_bitrates; i++) {
-		printk("sband: #bitrates->flags %d \n",sband->bitrates[i].flags);
-		printk("sband: #bitrates->bitrate %d \n",sband->bitrates[i].bitrate);
-		printk("sband: #bitrates->hw_value %d \n",sband->bitrates[i].hw_value);
-		printk("sband: #bitrates->hw_value_short %d \n",sband->bitrates[i].hw_value_short);
-	}
-	printk("sband: #ht_cap->cap %d \n",sband->ht_cap.cap);
-	printk("sband: #ht_cap->ht_supported %d \n",sband->ht_cap.ht_supported);
-	printk("sband: #ht_cap->ampdu_factor %d \n",sband->ht_cap.ampdu_factor);
-	printk("sband: #ht_cap->ampdu_density %d \n",sband->ht_cap.ampdu_density);
-	printk("sband: #ht_cap->mcs->rx_mask[0] %d \n",sband->ht_cap.mcs.rx_mask[0]);
-	printk("sband: #ht_cap->mcs->rx_mask[1] %d \n",sband->ht_cap.mcs.rx_mask[1]);
-	printk("sband: #ht_cap->mcs->rx_mask[2] %d \n",sband->ht_cap.mcs.rx_mask[2]);
-	printk("sband: #ht_cap->mcs->rx_mask[3] %d \n",sband->ht_cap.mcs.rx_mask[3]);
-	printk("sband: #ht_cap->mcs->rx_mask[4] %d \n",sband->ht_cap.mcs.rx_mask[4]);
-	printk("sband: #ht_cap->mcs->rx_mask[5] %d \n",sband->ht_cap.mcs.rx_mask[5]);
-	printk("sband: #ht_cap->mcs->rx_mask[6] %d \n",sband->ht_cap.mcs.rx_mask[6]);
-	printk("sband: #ht_cap->mcs->rx_mask[7] %d \n",sband->ht_cap.mcs.rx_mask[7]);
-	printk("sband: #ht_cap->mcs->rx_mask[8] %d \n",sband->ht_cap.mcs.rx_mask[8]);
-	printk("sband: #ht_cap->mcs->rx_mask[9] %d \n",sband->ht_cap.mcs.rx_mask[9]);
-	printk("sband: #ht_cap->mcs->rx_highest %d \n",sband->ht_cap.mcs.rx_highest);
-	printk("sband: #ht_cap->mcs->tx_params %d \n",sband->ht_cap.mcs.tx_params);
-	printk("sband: #ht_cap->mcs->reserved[0] %d \n",sband->ht_cap.mcs.reserved[0]);	
-	printk("sband: #ht_cap->mcs->reserved[1] %d \n",sband->ht_cap.mcs.reserved[1]);
-	printk("sband: #ht_cap->mcs->reserved[2] %d \n",sband->ht_cap.mcs.reserved[2]);
-	
+	ack_dur = ieee80211_frame_duration(local, 10, 60, 1, 1);
+	ci->overhead = ieee80211_frame_duration(local, 0, 60, 1, 1) + ack_dur;
+	ci->overhead_rtscts = ci->overhead + 2 * ack_dur;
 
-	//Print info: sta
-	printk("-------------------------------------\n");
-	printk("sta: #IEEE80211_NUM_BANDS %d \n",IEEE80211_NUM_BANDS);
-	for (i = 0; i < IEEE80211_NUM_BANDS; i++) {
-		printk("sta: supp_rates %d \n",sta->supp_rates[i]);
-	}
-	printk("sta: #ht_cap->cap %d \n",sta->ht_cap.cap);
-	printk("sta: #ht_cap->ht_supported %d \n",sta->ht_cap.ht_supported);
-	printk("sta: #ht_cap->ampdu_factor %d \n",sta->ht_cap.ampdu_factor);
-	printk("sta: #ht_cap->ampdu_density %d \n",sta->ht_cap.ampdu_density);
-	printk("sta: #ht_cap->mcs->rx_mask[0] %d \n",sta->ht_cap.mcs.rx_mask[0]);
-	printk("sta: #ht_cap->mcs->rx_mask[1] %d \n",sta->ht_cap.mcs.rx_mask[1]);
-	printk("sta: #ht_cap->mcs->rx_mask[2] %d \n",sta->ht_cap.mcs.rx_mask[2]);
-	printk("sta: #ht_cap->mcs->rx_mask[3] %d \n",sta->ht_cap.mcs.rx_mask[3]);
-	printk("sta: #ht_cap->mcs->rx_mask[4] %d \n",sta->ht_cap.mcs.rx_mask[4]);
-	printk("sta: #ht_cap->mcs->rx_mask[5] %d \n",sta->ht_cap.mcs.rx_mask[5]);
-	printk("sta: #ht_cap->mcs->rx_mask[6] %d \n",sta->ht_cap.mcs.rx_mask[6]);
-	printk("sta: #ht_cap->mcs->rx_mask[7] %d \n",sta->ht_cap.mcs.rx_mask[7]);
-	printk("sta: #ht_cap->mcs->rx_mask[8] %d \n",sta->ht_cap.mcs.rx_mask[8]);
-	printk("sta: #ht_cap->mcs->rx_mask[9] %d \n",sta->ht_cap.mcs.rx_mask[9]);
-	printk("sta: #ht_cap->mcs->rx_highest %d \n",sta->ht_cap.mcs.rx_highest);
-	printk("sta: #ht_cap->mcs->tx_params %d \n",sta->ht_cap.mcs.tx_params);
-	printk("sta: #ht_cap->mcs->reserved[0] %d \n",sta->ht_cap.mcs.reserved[0]);	
-	printk("sta: #ht_cap->mcs->reserved[1] %d \n",sta->ht_cap.mcs.reserved[1]);
-	printk("sta: #ht_cap->mcs->reserved[2] %d \n",sta->ht_cap.mcs.reserved[2]);	
-	printk("-------------------------------------\n");
-	*/
+	ci->avg_ampdu_len = MINSTREL_FRAC(1, 1);
 
-	/* Get the lowest index rate and calculate the duration of a ack tx */
-	ci->lowest_rix = rate_lowest_index (sband, sta);
-	ctl_rate = &sband->bitrates[ci->lowest_rix];
+	stbc = (sta_cap & IEEE80211_HT_CAP_RX_STBC) >>
+		IEEE80211_HT_CAP_RX_STBC_SHIFT;
+	ci->tx_flags |= stbc << IEEE80211_TX_CTL_STBC_SHIFT;
 
-	/* Populating information for each supported rate */
-	for (i = 0; i < sband->n_bitrates; i++) {
-		struct cogtra_rate *cr = &ci->r[n];
+	if (sta_cap & IEEE80211_HT_CAP_LDPC_CODING)
+		ci->tx_flags |= IEEE80211_TX_CTL_LDPC;
 
-		/* Check rate support */
-		if (!rate_supported (sta, sband->band, i))
+	if (oper_chan_type != NL80211_CHAN_HT40MINUS &&
+	    oper_chan_type != NL80211_CHAN_HT40PLUS)
+		sta_cap &= ~IEEE80211_HT_CAP_SUP_WIDTH_20_40;
+
+	for (i = 0; i < ARRAY_SIZE(ci->groups); i++) {
+		u16 req = 0;
+
+		ci->groups[i].supported = 0;
+		if (minstrel_mcs_groups[i].flags & IEEE80211_TX_RC_SHORT_GI) {
+			if (minstrel_mcs_groups[i].flags & IEEE80211_TX_RC_40_MHZ_WIDTH)
+				req |= IEEE80211_HT_CAP_SGI_40;
+			else
+				req |= IEEE80211_HT_CAP_SGI_20;
+		}
+
+		if (minstrel_mcs_groups[i].flags & IEEE80211_TX_RC_40_MHZ_WIDTH)
+			req |= IEEE80211_HT_CAP_SUP_WIDTH_20_40;
+
+		if ((sta_cap & req) != req)
 			continue;
 
-		n++;
-		memset (cr, 0, sizeof (*cr));
+		ci->groups[i].supported =
+			mcs->rx_mask[minstrel_mcs_groups[i].streams - 1];
 
-		/* Set index, bitrate and tx duration */
-		cr->rix = i;
-		cr->bitrate = sband->bitrates[i].bitrate / 5;
-		
-		calc_rate_durations (local, cr, &sband->bitrates[i]);
+		if (ci->groups[i].supported)
+			n_supported++;
 	}
 
-	/* Sort rates based on bitrate */
-	sort_bitrates (ci, n);
-
-	/* Mark unsupported rates with rix = -1 */
-	for (i = n; i < sband->n_bitrates; i++)
-		ci->r[i].rix = -1;
-
+	printk("n_supported:%d",n_supported);
+	if (!n_supported){
+		printk(" -> Legacy\n");
+		csp->is_ht = false;
+		memset(&csp->legacy, 0, sizeof(csp->legacy));
+		csp->legacy.r = csp->r;
+		csp->legacy.t = csp->t;
+		return mac80211_cogtra.rate_init(priv,sband,sta,&csp->legacy);
+	}
+	
 	ci->cur_stdev = COGTRA_HT_MAX_STDEV;
-	ci->n_rates = n;
+	ci->n_groups = n_supported;
+	ci->n_rates = ci->n_groups * MCS_GROUP_RATES;
 
 	/*Antes no alloc_sta()*/
 	ci->update_interval = COGTRA_HT_UPDATE_INTERVAL;
 	ci->update_counter = 0UL;
+
+	return;
 }
 
 static void
@@ -741,11 +681,6 @@ cogtra_ht_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 		kfree(csp);
 		return NULL;
 	}
-
-	/* Mudado para update_caps() 
-	ci->update_interval = COGTRA_HT_UPDATE_INTERVAL;
-	ci->update_counter = 0UL;
-	*/
 
 	return csp;
 }
@@ -809,4 +744,3 @@ rc80211_cogtra_ht_exit(void)
 {
 	ieee80211_rate_control_unregister (&mac80211_cogtra_ht);
 }
-
