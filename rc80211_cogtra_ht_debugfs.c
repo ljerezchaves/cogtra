@@ -108,9 +108,9 @@ cogtra_ht_stats_open (struct inode *inode, struct file *file)
 
 			p += sprintf(p, "HT%c0/%cGI ", htmode, gimode);
 
-			*(p++) = (idx == ci->random_rate_ndx)		? '*' : ' ';
-			*(p++) = (idx == ci->max_tp_rate_ndx) 	? 'T' : ' ';   
-			*(p++) = (idx == ci->max_prob_rate_ndx) 	? 'P' : ' ';  
+			*(p++) = (idx == ci->random_rate_mcs)		? '*' : ' ';
+			*(p++) = (idx == ci->max_tp_rate_mcs) 	? 'T' : ' ';   
+			*(p++) = (idx == ci->max_prob_rate_mcs) 	? 'P' : ' ';  
 
 			p += sprintf(p, " MCS%-2u", (minstrel_mcs_groups[i].streams - 1) *
 					MCS_GROUP_RATES + j);
@@ -151,12 +151,12 @@ cogtra_ht_stats_open (struct inode *inode, struct file *file)
 	p += sprintf(p, "\n Cognitive Transmission Rate Adaptation High Throughput(CogTRA_HT):\n"
 			"   Number of rates:      %u\n"
 			"   Current pkt interval: %u\n"
-			"   Current Normal Mean:  %u\n"
-		   	"   Current Normal Stdev: %u.%2u\n",
+			"   Current Normal Mean:  %u\n",
+		   	//"   Current Normal Stdev: %u.%2u\n",
 			ci->n_rates,
 			ci->update_interval,
-			ci->max_tp_rate_ndx,
-			ci->cur_stdev / 100, ci->cur_stdev % 100
+			ci->max_tp_rate_mcs//,
+			//ci->cur_stdev / 100, ci->cur_stdev % 100
 		);
 
 	cs->len = p - cs->buf;
