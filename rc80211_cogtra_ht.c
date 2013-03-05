@@ -307,7 +307,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		unsigned int max_tp_gix = 0, max_prob_gix = 0;
 		u32 max_tp_value = 0, max_prob_value = 0;		
 		
-		cg = &ci->groups[group];
+		cg = &ci->groups[i];
 		if (!cg->supported)
 			continue;
 		
@@ -329,7 +329,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 			 * to 1800 (100%) */
 			if (cr->attempts) {
 
-				usecs = minstrel_mcs_groups[i]->duration[j];
+				usecs = minstrel_mcs_groups[i].duration[j];
 				if (!usecs)
 					usecs = 1000000;
 
@@ -380,7 +380,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		/* Get a new random rate for next interval (using a normal distribution) */
 		random_gix = rc80211_cogtra_ht_normal_generator ((int)cg->max_tp_rate_gix,
 				(int)cg->cur_stdev);
-		cg->random_rate_gix = (unsigned int)(max (0, min (random,
+		cg->random_rate_gix = (unsigned int)(max (0, min (random_gix,
 						(int)((int)(MCS_GROUP_RATES) - 1))));
 		cg->rates[cg->random_rate_gix].times_called++;
 		
@@ -404,9 +404,9 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 			max_tp_rate_gix = i;
 			max_tp_rate = cg->max_tp_rate_gix;
 		}
-		if (max_prob_rate < cg->max_prob_rate) {
+		if (max_prob_rate < cg->max_prob_rate_gix) {
 			max_prob_rate_gix = i;
-			max_prob_rate = cg->max_prob_rate;
+			max_prob_rate = cg->max_prob_rate_gix;
 		}	
 	}
 		//ERRO
