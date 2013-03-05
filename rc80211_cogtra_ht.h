@@ -86,10 +86,11 @@ struct minstrel_mcs_group_data {
 	u8 supported;
 
 	/* selected primary rates */
-	unsigned int cur_stdev;	
-	unsigned int random_rate;
-	unsigned int max_tp_rate;
-	unsigned int max_prob_rate;
+	unsigned int cur_stdev;
+	
+	unsigned int random_rate_gix; //0 a 7
+	unsigned int max_tp_rate_gix;
+	unsigned int max_prob_rate_gix;
 
 	/* MCS rate statistics */
 	struct minstrel_rate_stats rates[MCS_GROUP_RATES];
@@ -103,13 +104,14 @@ struct cogtra_ht_sta{
 	unsigned int overhead_rtscts;
 	unsigned int avg_ampdu_len;
 
-	unsigned int cur_stdev;				// current normal stdev
-	unsigned int max_tp_rate_ndx;		// index of rate with highest thp (current normal mean)
-	unsigned int max_prob_rate_ndx;		// index of rate with highest probability
-	unsigned int random_rate_ndx;		// random rate index (will be used in the next interval) 
+	//unsigned int cur_stdev;			// current normal stdev
+	unsigned int random_rate_mcs;		// random mcs index (will be used in the next interval)  //0 a 
+	unsigned int max_tp_rate_mcs;		// index mcs with highest thp (current normal mean)
+	unsigned int max_prob_rate_mcs;		// index mcs with highest probability
 	
-	unsigned int n_groups;				// number o supported rates
-	unsigned int n_rates;				// number o supported rates 
+	unsigned int n_groups;				// number of actives MCS GROUPS
+	unsigned int n_rates;				// number o supported rates
+	
 	unsigned long update_counter;		// last update time (time based) or pkt counter (pkt based)
     unsigned int update_interval; 		// time (or pkts) between cogtra_ht_update_stats
 	unsigned long up_stats_counter;		// update stats counter

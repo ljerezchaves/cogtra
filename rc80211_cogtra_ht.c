@@ -252,24 +252,24 @@ rc80211_cogtra_ht_normal_generator (int mean, int stdev_times100)
 	return (int)(mean + ((value - 1524) * stdev_times100)/(round_fac * 256));
 }
 
+/*
 static inline int minstrel_get_duration(int index) {
 	const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
 	return group->duration[index % MCS_GROUP_RATES];
-}
+}*/
 
 static void cogtra_ht_set_rate(struct ieee80211_tx_rate *rate, int index){
-    	const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
-    	
-    	//rate->idx = index % MCS_GROUP_RATES + (group->streams - 1) * MCS_GROUP_RATES;
+    const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
+    //rate->idx = index % MCS_GROUP_RATES + (group->streams - 1) * MCS_GROUP_RATES;
 	rate->idx = index;
 	rate->flags = IEEE80211_TX_RC_MCS | group->flags;
 	rate->count = 2U;
 }
 
 static void cogtra_ht_tx_rate_populate(struct cogtra_ht_sta *ci) {
-	cogtra_ht_set_rate(&ci->tx_rates[0], ci->random_rate_ndx);
-	cogtra_ht_set_rate(&ci->tx_rates[1], ci->max_tp_rate_ndx);
-	cogtra_ht_set_rate(&ci->tx_rates[2], ci->max_prob_rate_ndx);
+	cogtra_ht_set_rate(&ci->tx_rates[0], ci->random_rate_mcs);
+	cogtra_ht_set_rate(&ci->tx_rates[1], ci->max_tp_rate_mcs);
+	cogtra_ht_set_rate(&ci->tx_rates[2], ci->max_prob_rate_mcs);
 	cogtra_ht_set_rate(&ci->tx_rates[3], 0);
 }
 
@@ -286,49 +286,50 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 	struct minstrel_mcs_group_data *cg;
     struct minstrel_rate_stats *cr;
 	
-	u32 usecs;
+	unsigned int random_rate_gix, random_rt;
+	unsigned int max_tp_rate_gix, max_tp_rate;
+	unsigned int max_prob_rate_gix, max_prob_rate ;
 	
-	unsigned int random_rate_gix, max_tp_rate_gix, max_prob_rate_gix;
-	unsigned int index, i, max_tp_ndx, max_prob_ndx, random_rt,max_tp_rate,max_prob_rate ;
-	
-	unsigned int old_stdev, old_mean;
-	u32 old_thp, new_thp;
-	
-	int random = 0;
-	int group;
+	int i,j;
 	
 	printk("HR: _update_stats\n");
 	ci->up_stats_counter++;
 	
 
 	/* For each supported rate... */
-	for (group = 0; group < ARRAY_SIZE(minstrel_mcs_groups); group++) {
-		u32 max_tp = 0, max_prob, randon_rt = 0;
-				
+	for (i = 0; i < ARRAY_SIZE(minstrel_mcs_groups); i++) {
+		unsigned int old_stdev, old_mean;
+		u32 old_thp, new_thp;
+		
+		int random_gix = 0;
+		u32 usecs;
+		
+		unsigned int max_tp_gix = 0, max_prob_gix = 0;
+		u32 max_tp_value = 0, max_prob_value = 0;		
+		
 		cg = &ci->groups[group];
 		if (!cg->supported)
 			continue;
 		
 		old_stdev 	= cg->cur_stdev;
-		old_mean 	= cg->max_tp_rate;
-		old_thp 	= minstrel_get_ratestats(ci,ci->random_rate_ndx)->avg_tp;
+		old_mean 	= cg->max_tp_rate_gix;
+		old_thp 	= cg->rates[cg->random_rate_gix].avg_tp;
 		
-		cg->random_rate = 0;
-		cg->max_tp_rate = 0;
-		cg->max_prob_rate = 0;
+		cg->random_rate_gix = 0;
+		cg->max_tp_rate_gix = 0;
+		cg->max_prob_rate_gix = 0;
 
-		for (i = 0; i < MCS_GROUP_RATES; i++) {
-			if (!(cg->supported & BIT(i)))
+		for (j = 0; j < MCS_GROUP_RATES; j++) {
+			if (!(cg->supported & BIT(j)))
 			continue;
 			
-			cr = &cg->rates[i];
-			index = MCS_GROUP_RATES * group + i;
+			cr = &cg->rates[j];
 			
 			/* To avoid rounding issues, probabilities scale from 0 (0%)
 			 * to 1800 (100%) */
 			if (cr->attempts) {
 
-				usecs = minstrel_get_duration(index);
+				usecs = minstrel_mcs_groups[i]->duration[j];
 				if (!usecs)
 					usecs = 1000000;
 
@@ -354,70 +355,71 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 			cr->success = 0;
 			cr->attempts = 0;
 		}
-		new_thp = cg->rates[cg->random_rate].avg_tp;
+		new_thp = cg->rates[cg->random_rate_gix].avg_tp;
 
 		/* Look for the rate with highest throughput and probability */
-		for (i = 0; i < MCS_GROUP_RATES; i++) {
+		for (j = 0; j < MCS_GROUP_RATES; j++) {
 			struct minstrel_rate_stats *cr = &cg->rates[i];
-			if (max_tp < cr->avg_tp) {
-				max_tp_ndx = i;
-				max_tp = cr->avg_tp;
+			if (max_tp_value < cr->avg_tp) {
+				max_tp_gix = j;
+				max_tp_value = cr->avg_tp;
 			}
-			if (max_prob < cr->avg_prob) {
-				max_prob_ndx = i;
-				max_prob = cr->avg_prob;
+			if (max_prob_value < cr->avg_prob) {
+				max_prob_gix = j;
+				max_prob_value = cr->avg_prob;
 			}
 		}
 		
-		cg->max_tp_rate = max_tp_ndx;
-		cg->max_prob_rate = max_prob_ndx;
+		cg->max_tp_rate_gix = max_tp_gix;
+		cg->max_prob_rate_gix = max_prob_gix;
 			
 		/* Adjusting stdev with CogTRA_HT AAA */
-		cg->cur_stdev = cogtra_ht_aaa (old_mean, cg->max_tp_rate,
+		cg->cur_stdev = cogtra_ht_aaa (old_mean, cg->max_tp_rate_gix,
 			old_thp, new_thp, old_stdev);
 
 		/* Get a new random rate for next interval (using a normal distribution) */
-		random = rc80211_cogtra_ht_normal_generator ((int)cg->max_tp_rate,
+		random_gix = rc80211_cogtra_ht_normal_generator ((int)cg->max_tp_rate_gix,
 				(int)cg->cur_stdev);
-		cg->random_rate = (unsigned int)(max (0, min (random,
+		cg->random_rate_gix = (unsigned int)(max (0, min (random,
 						(int)((int)(MCS_GROUP_RATES) - 1))));
-		cg->rates[cg->random_rate].times_called++;
+		cg->rates[cg->random_rate_gix].times_called++;
 		
 	}
 	
 	/* For each supported group... */
-	for (group = 0; group < ARRAY_SIZE(minstrel_mcs_groups); group++) {
+	for (i = 0; i < ARRAY_SIZE(minstrel_mcs_groups); i++) {
 		random_rt = 0;
 		max_tp_rate = 0;
 		max_prob_rate = 0;	
 
-		cg = &ci->groups[group];
+		cg = &ci->groups[i];
 		if (!cg->supported)
 			continue;
 		
-		if (random_rt < cg->random_rate) {
+		if (random_rt < cg->random_rate_gix) {
 			random_rate_gix = i;
-			random_rt = cg->random_rate;
+			random_rt = cg->random_rate_gix;
 		}
-		if (max_tp_rate < cg->max_tp_rate) {
+		if (max_tp_rate < cg->max_tp_rate_gix) {
 			max_tp_rate_gix = i;
-			max_tp_rate = cg->max_tp_rate;
+			max_tp_rate = cg->max_tp_rate_gix;
 		}
 		if (max_prob_rate < cg->max_prob_rate) {
 			max_prob_rate_gix = i;
 			max_prob_rate = cg->max_prob_rate;
 		}	
 	}
-		ci->random_rate_ndx = (random_rate_gix * MCS_GROUP_RATES) + random_rt;
-		ci->max_tp_rate_ndx = (max_tp_rate_gix * MCS_GROUP_RATES) + max_tp_rate;
-		ci->max_prob_rate_ndx = (max_prob_rate_gix * MCS_GROUP_RATES) + max_prob_rate;
+		//ERRO
+		ci->random_rate_mcs = (random_rate_gix * MCS_GROUP_RATES) + random_rt;
+		ci->max_tp_rate_mcs = (max_tp_rate_gix * MCS_GROUP_RATES) + max_tp_rate;
+		ci->max_prob_rate_mcs = (max_prob_rate_gix * MCS_GROUP_RATES) + max_prob_rate;
 		
 		cogtra_ht_tx_rate_populate (ci);
 
 		/* Adjust update_interval dependending on the random rate */
 		/* RANDOM < BEST || RANDOM.PROB < 10% */
 		/*if ((ci->rates[ci->random_rate_ndx].perfect_tx_time >
-					ci->rates[ci->max_tp_rate_ndx].perfect_tx_time) ||
+					ci->rates[ci->max_tp_rate_mcs].perfect_tx_time) ||
 				(ci->rates[ci->random_rate_ndx].avg_prob < 180)) 
 			ci->update_interval = COGTRA_HT_RECOVERY_INTERVAL;
 		else
@@ -601,8 +603,10 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 		ci->groups[i].supported =
 			mcs->rx_mask[minstrel_mcs_groups[i].streams - 1];
 
-		if (ci->groups[i].supported)
+		if (ci->groups[i].supported){
 			n_supported++;
+			ci->groups[i].cur_stdev = COGTRA_HT_MAX_STDEV;
+		}
 	}
 
 	printk("n_supported:%d",n_supported);
@@ -615,7 +619,6 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 		return mac80211_cogtra.rate_init(priv,sband,sta,&csp->legacy);
 	}
 	
-	ci->cur_stdev = COGTRA_HT_MAX_STDEV;
 	ci->n_groups = n_supported;
 	ci->n_rates = ci->n_groups * MCS_GROUP_RATES;
 
