@@ -108,9 +108,9 @@ cogtra_ht_stats_open (struct inode *inode, struct file *file)
 
 			p += sprintf(p, "HT%c0/%cGI ", htmode, gimode);
 
-			*(p++) = (idx == ci->random_rate_mcs)		? '*' : ' ';
+			*(p++) = (idx == ci->random_rate_mcs)	? '*' : ' ';
 			*(p++) = (idx == ci->max_tp_rate_mcs) 	? 'T' : ' ';   
-			*(p++) = (idx == ci->max_prob_rate_mcs) 	? 'P' : ' ';  
+			*(p++) = (idx == ci->max_prob_rate_mcs) ? 'P' : ' ';  
 
 			p += sprintf(p, " MCS%-2u", (minstrel_mcs_groups[i].streams - 1) *
 					MCS_GROUP_RATES + j);
