@@ -433,9 +433,9 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		ci->max_prob_rate_mcs = (max_prob_rate_gix * MCS_GROUP_RATES) + max_prob_rate;
 		
 		printk("FINALLY \n");
-		printk("before MCS random_rate %u\n",random_rt);		
-		printk("before MCS max tp %u\n",max_tp_rate);
-		printk("before MCS max prob %u\n",max_prob_rate);
+		//printk("before MCS random_rate %u\n",random_rt);		
+		//printk("before MCS max tp %u\n",max_tp_rate);
+		//printk("before MCS max prob %u\n",max_prob_rate);
 		printk("MCS random_rate %u\n",ci->random_rate_mcs);		
 		printk("MCS max tp %u\n",ci->max_tp_rate_mcs);
 		printk("MCS max prob %u\n",ci->max_prob_rate_mcs);
