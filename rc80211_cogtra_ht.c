@@ -325,6 +325,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		cg->max_prob_rate_gix = 0;
 
 		for (j = 0; j < MCS_GROUP_RATES; j++) {
+			printk("OK %d\n",j);
 			if (!(cg->supported & BIT(j)))
 			continue;
 			
@@ -419,11 +420,12 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		if (random_rt < cg->random_rate_gix) {
 			random_rate_gix = i;
 			random_rt = cg->random_rate_gix;
-		//printk("-ok%d\n",cg->random_rate_gix);
+			printk("Principal random %d - %u\n", i, random_rt);
 		}
 		if (max_tp_rate < cg->max_tp_rate_gix) {
 			max_tp_rate_gix = i;
 			max_tp_rate = cg->max_tp_rate_gix;
+			printk("Principal tp %d - %u\n", i, max_tp_rate);
 		}
 		if (max_prob_rate < cg->max_prob_rate_gix) {
 			max_prob_rate_gix = i;
