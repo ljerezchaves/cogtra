@@ -388,7 +388,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		printk("Using random_rate %u\n",random_rate_gix);		
 		printk("Using max tp %u\n",max_tp_rate_gix);
 		printk("Using max prob %u\n",max_prob_rate_gix);
-		printk("-----------------------");
+		printk("-----------------------\n");
 		
 	}
 	
