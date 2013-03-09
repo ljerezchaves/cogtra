@@ -272,6 +272,10 @@ static void cogtra_ht_tx_rate_populate(struct cogtra_ht_sta *ci) {
 	cogtra_ht_set_rate(&ci->tx_rates[1], ci->max_tp_rate_mcs);
 	cogtra_ht_set_rate(&ci->tx_rates[2], ci->max_prob_rate_mcs);
 	cogtra_ht_set_rate(&ci->tx_rates[3], 0);
+	printk("rates %u\n",ci->random_rate_mcs);
+	printk("rates %u\n",ci->max_tp_rate_mcs);
+	printk("rates %u\n",ci->max_prob_rate_mcs);
+	printk("------------\n");
 }
 
 static inline struct minstrel_rate_stats * minstrel_get_ratestats(struct cogtra_ht_sta *ci, int index){
@@ -350,13 +354,13 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 				cr->att_hist += cr->attempts;
 				
 				
-				printk("RATE %d\n",j);
-				printk("Rate usec %u\n",usecs);
-				printk("Rate attempts %u\n",cr->attempts);
-				printk("Rate succes %u\n",cr->success);		
-				printk("Rate tp %u\n",cr->cur_tp);
-				printk("Rate prob %u\n",cr->cur_prob);
-				printk("-----------------------\n");
+			//printk("RATE %d\n",j);
+			//printk("Rate usec %u\n",usecs);
+			//printk("Rate attempts %u\n",cr->attempts);
+			//printk("Rate succes %u\n",cr->success);		
+			//printk("Rate tp %u\n",cr->cur_tp);
+			//printk("Rate prob %u\n",cr->cur_prob);
+			//printk("-----------------------\n");
 				
 			}
 
@@ -394,13 +398,13 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		cg->random_rate_gix = (unsigned int)(max (0, min (random_gix,
 						(int)((int)(MCS_GROUP_RATES) - 1))));
 		cg->rates[cg->random_rate_gix].times_called++;
-		printk("GROUP %d\n",i);
-		printk("Using random_gix %d (%u)\n",random_gix,random_gix);
-		printk("Using cur_stdev %u\n",cg->cur_stdev);
-		printk("Using random_rate %u\n",cg->random_rate_gix);		
-		printk("Using max tp %u\n",cg->max_tp_rate_gix);
-		printk("Using max prob %u\n",cg->max_prob_rate_gix);
-		printk("-----------------------\n");
+	//printk("GROUP %d\n",i);
+	//printk("Using random_gix %d (%u)\n",random_gix,random_gix);
+	//printk("Using cur_stdev %u\n",cg->cur_stdev);
+	//printk("Using random_rate %u\n",cg->random_rate_gix);		
+	//printk("Using max tp %u\n",cg->max_tp_rate_gix);
+	//printk("Using max prob %u\n",cg->max_prob_rate_gix);
+	//printk("-----------------------\n");
 		
 	}
 	
@@ -416,7 +420,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		if (random_rt < cg->random_rate_gix) {
 			random_rate_gix = i;
 			random_rt = cg->random_rate_gix;
-			printk("-ok%d\n",cg->random_rate_gix);
+		//printk("-ok%d\n",cg->random_rate_gix);
 		}
 		if (max_tp_rate < cg->max_tp_rate_gix) {
 			max_tp_rate_gix = i;
@@ -432,14 +436,14 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		ci->max_tp_rate_mcs = (max_tp_rate_gix * MCS_GROUP_RATES) + max_tp_rate;
 		ci->max_prob_rate_mcs = (max_prob_rate_gix * MCS_GROUP_RATES) + max_prob_rate;
 		
-		printk("FINALLY \n");
-		printk("before MCS random_rate %u\n",random_rt);		
-		printk("before MCS max tp %u\n",max_tp_rate);
-		printk("before MCS max prob %u\n",max_prob_rate);
-		printk("MCS random_rate %u\n",ci->random_rate_mcs);		
-		printk("MCS max tp %u\n",ci->max_tp_rate_mcs);
-		printk("MCS max prob %u\n",ci->max_prob_rate_mcs);
-		printk("-----------------------\n");
+	//printk("FINALLY \n");
+	//printk("before MCS random_rate %u\n",random_rt);		
+	//printk("before MCS max tp %u\n",max_tp_rate);
+	//printk("before MCS max prob %u\n",max_prob_rate);
+	//printk("MCS random_rate %u\n",ci->random_rate_mcs);		
+	//printk("MCS max tp %u\n",ci->max_tp_rate_mcs);
+	//printk("MCS max prob %u\n",ci->max_prob_rate_mcs);
+	//printk("-----------------------\n");
 		cogtra_ht_tx_rate_populate (ci);
 
 		/* Adjust update_interval dependending on the random rate */
@@ -764,7 +768,7 @@ int __init
 rc80211_cogtra_ht_init(void)
 {
 	int i;
-	printk ("LJC CogTRA_HT algorithm.\n");
+//printk ("LJC CogTRA_HT algorithm.\n");
 	return ieee80211_rate_control_register (&mac80211_cogtra_ht);
 }
 
