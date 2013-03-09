@@ -333,7 +333,6 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 			/* To avoid rounding issues, probabilities scale from 0 (0%)
 			 * to 1800 (100%) */
 			if (cr->attempts) {
-
 				usecs = minstrel_mcs_groups[i].duration[j];
 				if (!usecs)
 					usecs = 1000000;
@@ -374,7 +373,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 
 		/* Look for the rate with highest throughput and probability */
 		for (j = 0; j < MCS_GROUP_RATES; j++) {
-			struct minstrel_rate_stats *cr = &cg->rates[i];
+			struct minstrel_rate_stats *cr = &cg->rates[j];
 			if (max_tp_value < cr->avg_tp) {
 				max_tp_gix = j;
 				max_tp_value = cr->avg_tp;
