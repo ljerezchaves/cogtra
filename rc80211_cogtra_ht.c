@@ -131,7 +131,7 @@ cogtra_ht_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp,
 	s32 delta = (s32)(last_thp / 10);
 	s32 diff = (s32)(curr_thp - last_thp);
 	
-	printk("HR: _aaa\n");
+	//printk("HR: _aaa\n");
 	if (abs (diff) > delta)
 		return min (stdev + 10, (unsigned int) COGTRA_HT_MAX_STDEV);
 	else
@@ -148,7 +148,7 @@ rc80211_cogtra_ht_normal_generator (int mean, int stdev_times100)
 	int round_fac = 0;
 	unsigned int i = 0;
 
-	printk("HR: _normal_generator\n");
+	//printk("HR: _normal_generator\n");
 	/* Convolution method to generate random normal numbers
 	 * Refer to "Raj Jain", "The art of computer systems performance analysis",
 	 * 1 edition, page 494.
@@ -293,7 +293,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 	
 	int i,j;
 	
-	printk("HR: _update_stats\n");
+	//printk("HR: _update_stats\n");
 	ci->up_stats_counter++;
 	
 
@@ -384,6 +384,10 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		cg->random_rate_gix = (unsigned int)(max (0, min (random_gix,
 						(int)((int)(MCS_GROUP_RATES) - 1))));
 		cg->rates[cg->random_rate_gix].times_called++;
+		printk("Using random %u\n",random_rate_gix);		
+		printk("Using max tp %u\n",max_tp_rate_gix;
+		printk("Using max prob %u\n",max_prob_rate_gix;
+		printk("-----------------------");
 		
 	}
 	
@@ -442,16 +446,16 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	int i, ndx;
 	int success;
  
-	printk("HR: _tx_status");
+	//printk("HR: _tx_status");
 	if(!csp->is_ht){
-		printk(" -> Legacy\n");
+		//printk(" -> Legacy\n");
 		return mac80211_cogtra.tx_status(priv,sband, sta, &csp->legacy,skb);
 	}
-	printk(" -> HT\n");
+	//printk(" -> HT\n");
  	/* Checking for a success in frame transmission */
 	success = !!(info->flags & IEEE80211_TX_STAT_ACK);
 
-	printk("Using %d\n",ar[0].idx);
+	//printk("Using %d\n",ar[0].idx);
 	/* Updating information for each used rate */
 	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
 	
@@ -500,12 +504,12 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	if (rate_control_send_low (sta, priv_sta, txrc))
 		return;
 
-	printk ("HR: _get_rate");
+	//printk ("HR: _get_rate");
 	if(!csp->is_ht){
-		printk(" -> Legacy\n");
+		//printk(" -> Legacy\n");
 		return mac80211_cogtra.get_rate(priv, sta, &csp->legacy, txrc);
 	}
-	printk(" -> HT\n");
+	//printk(" -> HT\n");
 	/* Check MRR hardware support */
 	mrr = cp->has_mrr && !txrc->rts && !txrc->bss_conf->use_cts_prot;
 
@@ -552,17 +556,17 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 	int ack_dur;
 	int stbc;
 
-	printk("HR: _update_caps()");
+	//printk("HR: _update_caps()");
 	/* fall back to the old cogtra for legacy stations */
 	if(!sta->ht_cap.ht_supported){
-		printk(" -> Legacy\n");
+		//printk(" -> Legacy\n");
 		csp->is_ht = false;
 		memset(&csp->legacy, 0, sizeof(csp->legacy));
 		csp->legacy.r = csp->r;
 		csp->legacy.t = csp->t;
 		return mac80211_cogtra.rate_init(priv,sband,sta,&csp->legacy);
 	}
-	printk(" -> HT\n");
+	//printk(" -> HT\n");
 
 	csp->is_ht = true;
 	memset(ci,0,sizeof(*ci));
@@ -610,9 +614,9 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 		}
 	}
 
-	printk("n_supported:%d",n_supported);
+	//printk("n_supported:%d",n_supported);
 	if (!n_supported){
-		printk(" -> Legacy\n");
+		//printk(" -> Legacy\n");
 		csp->is_ht = false;
 		memset(&csp->legacy, 0, sizeof(csp->legacy));
 		csp->legacy.r = csp->r;
@@ -635,7 +639,7 @@ cogtra_ht_rate_init (void *priv, struct ieee80211_supported_band *sband,
 		struct ieee80211_sta *sta, void *priv_sta)
 {
 	struct cogtra_priv *cp = priv;
-	printk("HR: _rate_init()\n");
+	//printk("HR: _rate_init()\n");
 	cogtra_ht_update_caps(priv, sband, sta, priv_sta, cp->hw->conf.channel_type);
 }
 
@@ -644,7 +648,7 @@ cogtra_ht_rate_update (void *priv, struct ieee80211_supported_band *sband,
 		struct ieee80211_sta *sta, void *priv_sta,
 		u32 changed, enum nl80211_channel_type oper_chan_type)
 {
-	printk("HR: _rate_update()\n");
+	//printk("HR: _rate_update()\n");
 	cogtra_ht_update_caps(priv, sband, sta, priv_sta, oper_chan_type);
 }
 
@@ -659,7 +663,7 @@ cogtra_ht_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 	int max_rates = 0;
 	int i;
 
-	printk("HR: _alloc_sta()\n");
+	//printk("HR: _alloc_sta()\n");
 	csp = kzalloc (sizeof (struct cogtra_ht_sta_priv), gfp);
 	if (!csp)
 		return NULL;
@@ -696,7 +700,7 @@ cogtra_ht_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 {
 	struct cogtra_ht_sta_priv *csp = priv_sta;
 
-	printk("HR: _free_sta()\n");
+	//printk("HR: _free_sta()\n");
 	kfree (csp->t);
 	kfree (csp->r);
 	kfree (csp);
@@ -707,7 +711,7 @@ cogtra_ht_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 static void *
 cogtra_ht_alloc (struct ieee80211_hw *hw, struct dentry *debugfsdir)
 {
-	printk("HR: _alloc()\n");
+	//printk("HR: _alloc()\n");
 	return mac80211_cogtra.alloc(hw, debugfsdir);
 }
 
@@ -739,7 +743,7 @@ int __init
 rc80211_cogtra_ht_init(void)
 {
 	int i;
-	printk ("LJC CogTRA_HT algorithm.\n");
+	//printk ("LJC CogTRA_HT algorithm.\n");
 	return ieee80211_rate_control_register (&mac80211_cogtra_ht);
 }
 
