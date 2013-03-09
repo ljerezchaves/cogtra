@@ -355,15 +355,13 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 				cr->succ_hist += cr->success;
 				cr->att_hist += cr->attempts;
 				
-				
-			//printk("RATE %d\n",j);
-			//printk("Rate usec %u\n",usecs);
-			//printk("Rate attempts %u\n",cr->attempts);
-			//printk("Rate succes %u\n",cr->success);		
-			//printk("Rate tp %u\n",cr->cur_tp);
-			//printk("Rate prob %u\n",cr->cur_prob);
-			//printk("-----------------------\n");
-				
+				//printk("RATE %d\n",j);
+				//printk("Rate usec %u\n",usecs);
+				//printk("Rate attempts %u\n",cr->attempts);
+				//printk("Rate succes %u\n",cr->success);		
+				//printk("Rate tp %u\n",cr->cur_tp);
+				//printk("Rate prob %u\n",cr->cur_prob);
+				//printk("-----------------------\n");
 			}
 
 			/* Update success and attempt counters */
@@ -493,7 +491,6 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
  	/* Checking for a success in frame transmission */
 	success = !!(info->flags & IEEE80211_TX_STAT_ACK);
 
-	//printk("Using %d\n",ar[0].idx);
 	/* Updating information for each used rate */
 	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
 	
@@ -502,11 +499,11 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 			break;
 
 		/* Getting the local idx for this ieee80211_tx_rate */
-		
 		ndx = ar[i].idx;
+		printk("Using %d\n group %d rate %d\n", ndx, ndx / MCS_GROUP_RATES, ndx % MCS_GROUP_RATES);
 		if (ndx < 0)
 			continue;
-
+		printk(" Ok\n");
 		/* Increasing attempts counter */
 		minstrel_get_ratestats(ci,ndx)->attempts += ar[i].count;
 		ci->update_counter += ar[i].count;
@@ -515,6 +512,7 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 		/* If it is the last used rate and resultesd in tx success, also
 		 * increse the success counter */
 		if ((i != IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) {
+			printk("Succes MCS%d\n",ndx);
 			minstrel_get_ratestats(ci,ndx)->success += success;
 			//ct[i].suc += success;
 		}
