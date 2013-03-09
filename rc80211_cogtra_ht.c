@@ -54,6 +54,7 @@
 #include "rc80211_cogtra_ht.h"
 
 
+
 #define AVG_PKT_SIZE	1200
 
 /* Number of bits for an average sized packet */
