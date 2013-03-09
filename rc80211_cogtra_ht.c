@@ -123,6 +123,8 @@ const struct mcs_group minstrel_mcs_groups[] = {
 #endif
 };
 
+int groupFlag = 0; 
+
 static inline int
 cogtra_ht_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp, 
 		u32 curr_thp, unsigned int stdev)
@@ -410,24 +412,34 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 	
 	random_rt = 0;
 	max_tp_rate = 0;
-	max_prob_rate = 0;	
+	max_prob_rate = 0;
+	
+	
+	//Qual dos dois grupos?
+		if(groupFlag == 0){
+			random_rate_gix = 0;
+			random_rt = ci->groups[0]->random_rate_gix;
+			printk("Principal random %d - %u\n", i, random_rt);
+			groupFlag = 1;
+		}else{
+			random_rate_gix = 1;
+			random_rt = ci->groups[1]->random_rate_gix;
+			printk("Principal random %d - %u\n", i, random_rt);
+			groupFlag = 0;
+		}
+			
 	/* For each supported group... */
 	for (i = 0; i < ARRAY_SIZE(minstrel_mcs_groups); i++) {
 		cg = &ci->groups[i];
 		if (!cg->supported)
 			continue;
-		
-		if (random_rt < cg->random_rate_gix) {
-			random_rate_gix = i;
-			random_rt = cg->random_rate_gix;
-			printk("Principal random %d - %u\n", i, random_rt);
-		}
-		if (max_tp_rate < cg->max_tp_rate_gix) {
+			
+		if (max_tp_rate < cg->rates[max_tp_rate_gix]->avg_tp) {
 			max_tp_rate_gix = i;
 			max_tp_rate = cg->max_tp_rate_gix;
 			printk("Principal tp %d - %u\n", i, max_tp_rate);
 		}
-		if (max_prob_rate < cg->max_prob_rate_gix) {
+		if (max_prob_rate < cg->rates[max_prob_rate_gix]->prob_tp) {
 			max_prob_rate_gix = i;
 			max_prob_rate = cg->max_prob_rate_gix;
 		}	
