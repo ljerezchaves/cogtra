@@ -297,8 +297,17 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 		/* Update success and attempt counters */
 		cr->last_success = cr->success;
 		cr->last_attempts = cr->attempts;
+
+		printk("RATE %d\n",j);
+		printk("Rate usec %u\n",usecs);
+		printk("Rate attempts %u\n",cr->attempts);
+		printk("Rate succes %u\n",cr->success);		
+		printk("Rate tp %u\n",cr->cur_tp);
+		printk("Rate prob %u\n",cr->cur_prob);
+		printk("-----------------------\n");
 		cr->success = 0;
 		cr->attempts = 0;
+		
 	}
 
 	new_thp = ci->r[ci->random_rate_ndx].avg_tp;
@@ -333,7 +342,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 	cogtra_mrr_populate (ci);
 
 	printk("Using random_gix %d (%u)\n",random,random);
-	printk("Using cur_stdev %u\n",cg->cur_stdev);
+	printk("Using cur_stdev %u\n",ci->cur_stdev);
 	printk("Using random_rate %u\n",ci->random_rate_ndx);
 	printk("Using max tp %u\n",ci->max_tp_rate_ndx);
 	printk("Using max prob %u\n",ci->max_prob_rate_ndx);

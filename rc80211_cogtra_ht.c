@@ -348,6 +348,18 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 				/* Update success and attempt counters */
 				cr->succ_hist += cr->success;
 				cr->att_hist += cr->attempts;
+				
+				
+				printk("RATE %d\n",j);
+				printk("Rate usec %u\n",usecs);
+				printk("Rate attempts %u\n",cr->attempts);
+				printk("Rate succes %u\n",cr->success);		
+				printk("Rate tp %u\n",cr->cur_tp);
+				printk("Rate prob %u\n",cr->cur_prob);
+				printk("-----------------------\n");
+				
+				cr->success = 0;
+				cr->attempts = 0;
 			}
 
 			/* Update success and attempt counters */
@@ -384,6 +396,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		cg->random_rate_gix = (unsigned int)(max (0, min (random_gix,
 						(int)((int)(MCS_GROUP_RATES) - 1))));
 		cg->rates[cg->random_rate_gix].times_called++;
+		printk("GROUP %d\n",i);
 		printk("Using random_gix %d (%u)\n",random_gix,random_gix);
 		printk("Using cur_stdev %u\n",cg->cur_stdev);
 		printk("Using random_rate %u\n",cg->random_rate_gix);		
@@ -421,6 +434,11 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		ci->max_tp_rate_mcs = (max_tp_rate_gix * MCS_GROUP_RATES) + max_tp_rate;
 		ci->max_prob_rate_mcs = (max_prob_rate_gix * MCS_GROUP_RATES) + max_prob_rate;
 		
+		printk("FINALLY \n");
+		printk("MCS random_rate %u\n",ci->random_rate_mcs);		
+		printk("MCS max tp %u\n",ci->max_tp_rate_mcs);
+		printk("MCS max prob %u\n",ci->max_prob_rate_mcs);
+		printk("-----------------------\n");
 		cogtra_ht_tx_rate_populate (ci);
 
 		/* Adjust update_interval dependending on the random rate */
