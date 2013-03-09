@@ -418,12 +418,12 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 	//Qual dos dois grupos?
 		if(groupFlag == 0){
 			random_rate_gix = 0;
-			random_rt = ci->groups[0]->random_rate_gix;
+			random_rt = ci->groups[0].random_rate_gix;
 			printk("Principal random %d - %u\n", i, random_rt);
 			groupFlag = 1;
 		}else{
 			random_rate_gix = 1;
-			random_rt = ci->groups[1]->random_rate_gix;
+			random_rt = ci->groups[1].random_rate_gix;
 			printk("Principal random %d - %u\n", i, random_rt);
 			groupFlag = 0;
 		}
@@ -434,12 +434,12 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		if (!cg->supported)
 			continue;
 			
-		if (max_tp_rate < cg->rates[max_tp_rate_gix]->avg_tp) {
+		if (max_tp_rate < cg->rates[max_tp_rate_gix].avg_tp) {
 			max_tp_rate_gix = i;
 			max_tp_rate = cg->max_tp_rate_gix;
 			printk("Principal tp %d - %u\n", i, max_tp_rate);
 		}
-		if (max_prob_rate < cg->rates[max_prob_rate_gix]->prob_tp) {
+		if (max_prob_rate < cg->rates[max_prob_rate_gix].prob_tp) {
 			max_prob_rate_gix = i;
 			max_prob_rate = cg->max_prob_rate_gix;
 		}	
