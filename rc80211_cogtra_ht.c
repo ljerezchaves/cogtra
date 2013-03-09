@@ -381,12 +381,13 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		/* Get a new random rate for next interval (using a normal distribution) */
 		random_gix = rc80211_cogtra_ht_normal_generator ((int)cg->max_tp_rate_gix,
 				(int)cg->cur_stdev);
-		cg->random_rate_gix = (unsigned int)(max (0, min (random_gix,7));
+		cg->random_rate_gix = (unsigned int)(max (0, min (random_gix,
+						(int)((int)(MCS_GROUP_RATES) - 1))));
 		cg->rates[cg->random_rate_gix].times_called++;
 		printk("Using random_gix %d (%u)\n",random_gix,random_gix);
-		printk("Using random_rate %u\n",random_rate_gix);		
-		printk("Using max tp %u\n",max_tp_rate_gix);
-		printk("Using max prob %u\n",max_prob_rate_gix);
+		printk("Using random_rate %u\n",cg->random_rate_gix);		
+		printk("Using max tp %u\n",cg->max_tp_rate_gix);
+		printk("Using max prob %u\n",cg->max_prob_rate_gix);
 		printk("-----------------------\n");
 		
 	}
