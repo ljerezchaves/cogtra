@@ -439,7 +439,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 			max_tp_rate = cg->max_tp_rate_gix;
 			printk("Principal tp %d - %u\n", i, max_tp_rate);
 		}
-		if (max_prob_rate < cg->rates[max_prob_rate_gix].prob_tp) {
+		if (max_prob_rate < cg->rates[max_prob_rate_gix].avg_prob) {
 			max_prob_rate_gix = i;
 			max_prob_rate = cg->max_prob_rate_gix;
 		}	
