@@ -404,12 +404,11 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		
 	}
 	
+	random_rt = 0;
+	max_tp_rate = 0;
+	max_prob_rate = 0;	
 	/* For each supported group... */
 	for (i = 0; i < ARRAY_SIZE(minstrel_mcs_groups); i++) {
-		random_rt = 0;
-		max_tp_rate = 0;
-		max_prob_rate = 0;	
-
 		cg = &ci->groups[i];
 		if (!cg->supported)
 			continue;
