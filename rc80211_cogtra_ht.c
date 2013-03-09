@@ -386,8 +386,8 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		cg->rates[cg->random_rate_gix].times_called++;
 		printk("Using random_gix %d (%u)\n",random_gix,random_gix);
 		printk("Using random_rate %u\n",random_rate_gix);		
-		printk("Using max tp %u\n",max_tp_rate_gix;
-		printk("Using max prob %u\n",max_prob_rate_gix;
+		printk("Using max tp %u\n",max_tp_rate_gix);
+		printk("Using max prob %u\n",max_prob_rate_gix);
 		printk("-----------------------");
 		
 	}
@@ -744,7 +744,7 @@ int __init
 rc80211_cogtra_ht_init(void)
 {
 	int i;
-	//printk ("LJC CogTRA_HT algorithm.\n");
+	printk ("LJC CogTRA_HT algorithm.\n");
 	return ieee80211_rate_control_register (&mac80211_cogtra_ht);
 }
 
