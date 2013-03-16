@@ -274,10 +274,10 @@ static void cogtra_ht_tx_rate_populate(struct cogtra_ht_sta *ci) {
 	cogtra_ht_set_rate(&ci->tx_rates[1], ci->max_tp_rate_mcs);
 	cogtra_ht_set_rate(&ci->tx_rates[2], ci->max_prob_rate_mcs);
 	cogtra_ht_set_rate(&ci->tx_rates[3], 0);
-	printk("rates %u\n",ci->random_rate_mcs);
-	printk("rates %u\n",ci->max_tp_rate_mcs);
-	printk("rates %u\n",ci->max_prob_rate_mcs);
-	printk("------------\n");
+	//printk("rates %u\n",ci->random_rate_mcs);
+	//printk("rates %u\n",ci->max_tp_rate_mcs);
+	//printk("rates %u\n",ci->max_prob_rate_mcs);
+	//printk("------------\n");
 }
 
 static inline struct minstrel_rate_stats * minstrel_get_ratestats(struct cogtra_ht_sta *ci, int index){
@@ -327,7 +327,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		cg->max_prob_rate_gix = 0;
 
 		for (j = 0; j < MCS_GROUP_RATES; j++) {
-			printk("OK %d\n",j);
+			//printk("OK %d\n",j);
 			if (!(cg->supported & BIT(j)))
 			continue;
 			
@@ -417,12 +417,12 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		if(groupFlag == 0){
 			random_rate_gix = 0;
 			random_rt = ci->groups[0].random_rate_gix;
-			printk("Principal random %d - %u\n", i, random_rt);
+			//printk("Principal random %d - %u\n", i, random_rt);
 			groupFlag = 1;
 		}else{
 			random_rate_gix = 1;
 			random_rt = ci->groups[1].random_rate_gix;
-			printk("Principal random %d - %u\n", i, random_rt);
+			//printk("Principal random %d - %u\n", i, random_rt);
 			groupFlag = 0;
 		}
 			
@@ -435,7 +435,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		if (max_tp_rate < cg->rates[max_tp_rate_gix].avg_tp) {
 			max_tp_rate_gix = i;
 			max_tp_rate = cg->max_tp_rate_gix;
-			printk("Principal tp %d - %u\n", i, max_tp_rate);
+			//printk("Principal tp %d - %u\n", i, max_tp_rate);
 		}
 		if (max_prob_rate < cg->rates[max_prob_rate_gix].avg_prob) {
 			max_prob_rate_gix = i;
@@ -500,10 +500,10 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 
 		/* Getting the local idx for this ieee80211_tx_rate */
 		ndx = ar[i].idx;
-		printk("Using %d\n group %d rate %d\n", ndx, ndx / MCS_GROUP_RATES, ndx % MCS_GROUP_RATES);
+		printk("MCS%d ", ndx);
 		if (ndx < 0)
 			continue;
-		printk(" Ok\n");
+		//printk(" Ok\n");
 		/* Increasing attempts counter */
 		minstrel_get_ratestats(ci,ndx)->attempts += ar[i].count;
 		ci->update_counter += ar[i].count;
@@ -512,7 +512,7 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 		/* If it is the last used rate and resultesd in tx success, also
 		 * increse the success counter */
 		if ((i != IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) {
-			printk("Succes MCS%d\n",ndx);
+			printk("- Succes\n");
 			minstrel_get_ratestats(ci,ndx)->success += success;
 			//ct[i].suc += success;
 		}
@@ -779,7 +779,7 @@ int __init
 rc80211_cogtra_ht_init(void)
 {
 	int i;
-//printk ("LJC CogTRA_HT algorithm.\n");
+	printk ("LJC CogTRA_HT algorithm.\n");
 	return ieee80211_rate_control_register (&mac80211_cogtra_ht);
 }
 
