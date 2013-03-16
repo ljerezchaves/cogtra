@@ -103,6 +103,7 @@ struct cogtra_ht_sta{
 	unsigned int overhead;
 	unsigned int overhead_rtscts;
 	unsigned int avg_ampdu_len;
+	unsigned int ampdu_packets;
 
 	//unsigned int cur_stdev;			// current normal stdev
 	unsigned int random_rate_mcs;		// random mcs index (will be used in the next interval)  //0 a 

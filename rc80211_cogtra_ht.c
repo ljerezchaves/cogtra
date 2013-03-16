@@ -261,6 +261,30 @@ static inline int minstrel_get_duration(int index) {
 	return group->duration[index % MCS_GROUP_RATES];
 }*/
 
+
+/*
+ * Calculate throughput based on the average A-MPDU length, taking into account
+ * the expected number of retransmissions and their expected length
+ */
+static void
+minstrel_ht_calc_tp(struct cogtra_priv *cp, struct cogtra_ht_sta *ci,
+                    int group, int rate)
+{
+	struct minstrel_rate_stats *cr;
+	unsigned int usecs;
+
+	cr = &ci->groups[group].rates[rate];
+
+	//if (cr->probability < MINSTREL_FRAC(1, 10)) {
+		//mr->cur_tp = 0;
+		//return;
+	//}
+
+	usecs = ci->overhead / MINSTREL_TRUNC(ci->avg_ampdu_len);
+	usecs += minstrel_mcs_groups[group].duration[rate];
+	cr->cur_tp = MINSTREL_TRUNC((1000000 / usecs) * cr->probability);
+}
+
 static void cogtra_ht_set_rate(struct ieee80211_tx_rate *rate, int index){
     const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
     //rate->idx = index % MCS_GROUP_RATES + (group->streams - 1) * MCS_GROUP_RATES;
@@ -302,6 +326,11 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 	//printk("HR: _update_stats\n");
 	ci->up_stats_counter++;
 	
+	if (ci->ampdu_packets > 0) {
+		ci->avg_ampdu_len = ((MINSTREL_FRAC(ci->ampdu_len, ci->ampdu_packets) * (100 - cp->ewma_level)) + (ci->avg_ampdu_len * cp->ewma_level)) / 100;
+		ci->ampdu_len = 0;
+		ci->ampdu_packets = 0;
+	}
 
 	/* For each supported rate... */
 	for (i = 0; i < ARRAY_SIZE(minstrel_mcs_groups); i++) {
@@ -342,7 +371,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 
 				/* Update thp and prob for last interval */
 				cr->cur_prob 	= (cr->success * 1800) / cr->attempts;
-				cr->cur_tp 		= cr->cur_prob * (1000000 / usecs);
+				minstrel_ht_calc_tp(cp, ci, i, j);
 
 				/* Update average thp and prob with EWMA */
 				cr->avg_prob = cr->avg_prob ? ((cr->cur_prob * (100 -
@@ -468,6 +497,40 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		}*/
 }
 
+/*
+ * Look up an MCS group index based on mac80211 rate information
+ */
+static int
+minstrel_ht_get_group_idx(struct ieee80211_tx_rate *rate)
+{
+	int streams = (rate->idx / MCS_GROUP_RATES) + 1;
+	u32 flags = IEEE80211_TX_RC_SHORT_GI | IEEE80211_TX_RC_40_MHZ_WIDTH;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(minstrel_mcs_groups); i++) {
+		if (minstrel_mcs_groups[i].streams != streams)
+			continue;
+		if (minstrel_mcs_groups[i].flags != (rate->flags & flags))
+			continue;
+
+		return i;
+	}
+
+	WARN_ON(1);
+	return 0;
+}
+
+static bool
+minstrel_ht_txstat_valid(struct ieee80211_tx_rate *rate)
+{
+	if (!rate->count)
+		return false;
+
+	if (rate->idx < 0)
+		return false;
+
+	return !!(rate->flags & IEEE80211_TX_RC_MCS);
+}
 
 /* cogtra_ht_tx_status is called just after frame tx and it is used to update
  * statistics information for the used rate */
@@ -479,7 +542,8 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	struct cogtra_ht_sta *ci = &csp->ht;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_tx_rate *ar = info->status.rates;
-	int i, ndx;
+	struct minstrel_rate_stats *rate;
+	int i, ndx,last,group;
 	int success;
  
 	//printk("HR: _tx_status");
@@ -488,35 +552,35 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 		return mac80211_cogtra.tx_status(priv,sband, sta, &csp->legacy,skb);
 	}
 	//printk(" -> HT\n");
- 	/* Checking for a success in frame transmission */
-	success = !!(info->flags & IEEE80211_TX_STAT_ACK);
-
-	/* Updating information for each used rate */
-	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
 	
-		/* A rate idx -1 means that the following rates weren't used in tx */
-		if (ar[i].idx < 0)
+	if ((info->flags & IEEE80211_TX_CTL_AMPDU) &&
+	    !(info->flags & IEEE80211_TX_STAT_AMPDU))
+		return;
+
+	if (!(info->flags & IEEE80211_TX_STAT_AMPDU)) {
+		info->status.ampdu_ack_len =
+			(info->flags & IEEE80211_TX_STAT_ACK ? 1 : 0);
+		info->status.ampdu_len = 1;
+	}
+	mi->ampdu_packets++;
+	mi->ampdu_len += info->status.ampdu_len;
+	
+	for (i = 0; !last; i++) {
+		last = (i == IEEE80211_TX_MAX_RATES - 1) ||
+		       !minstrel_ht_txstat_valid(&ar[i + 1]);
+
+		if (!minstrel_ht_txstat_valid(&ar[i]))
 			break;
 
-		/* Getting the local idx for this ieee80211_tx_rate */
-		ndx = ar[i].idx;
-		printk("MCS%d ", ndx);
-		if (ndx < 0)
-			continue;
-		//printk(" Ok\n");
-		/* Increasing attempts counter */
-		minstrel_get_ratestats(ci,ndx)->attempts += ar[i].count;
-		ci->update_counter += ar[i].count;
-		//ct[i].att += ar[i].count;
+		group = minstrel_ht_get_group_idx(&ar[i]);
+		rate = &ci->groups[group].rates[ar[i].idx % 8];
 
-		/* If it is the last used rate and resultesd in tx success, also
-		 * increse the success counter */
-		if ((i != IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) {
-			printk("- Succes\n");
-			minstrel_get_ratestats(ci,ndx)->success += success;
-			//ct[i].suc += success;
-		}
+		if (last)
+			rate->success += info->status.ampdu_ack_len;
+
+		rate->attempts += ar[i].count * info->status.ampdu_len;
 	}
+
 }
 
 
