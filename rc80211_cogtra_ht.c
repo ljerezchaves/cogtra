@@ -275,14 +275,14 @@ minstrel_ht_calc_tp(struct cogtra_priv *cp, struct cogtra_ht_sta *ci,
 
 	cr = &ci->groups[group].rates[rate];
 
-	//if (cr->probability < MINSTREL_FRAC(1, 10)) {
+	//if (mr->probability < MINSTREL_FRAC(1, 10)) {
 		//mr->cur_tp = 0;
 		//return;
 	//}
 
 	usecs = ci->overhead / MINSTREL_TRUNC(ci->avg_ampdu_len);
 	usecs += minstrel_mcs_groups[group].duration[rate];
-	cr->cur_tp = MINSTREL_TRUNC((1000000 / usecs) * cr->probability);
+	cr->cur_tp = MINSTREL_TRUNC((1000000 / usecs) * cr->cur_prob); //USar a média ou a curr_prob??
 }
 
 static void cogtra_ht_set_rate(struct ieee80211_tx_rate *rate, int index){
@@ -562,8 +562,8 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 			(info->flags & IEEE80211_TX_STAT_ACK ? 1 : 0);
 		info->status.ampdu_len = 1;
 	}
-	mi->ampdu_packets++;
-	mi->ampdu_len += info->status.ampdu_len;
+	ci->ampdu_packets++;
+	ci->ampdu_len += info->status.ampdu_len;
 	
 	for (i = 0; !last; i++) {
 		last = (i == IEEE80211_TX_MAX_RATES - 1) ||
