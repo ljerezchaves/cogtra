@@ -159,7 +159,7 @@ cogtra_ht_stats_open (struct inode *inode, struct file *file)
 			//ci->cur_stdev / 100, ci->cur_stdev % 100
 		);
 
-	p += sprintf(p, "Average A-MPDU length: %d.%d\n",
+	p += sprintf(p,"   Average A-MPDU length: %d.%d\n",
 		MINSTREL_TRUNC(ci->avg_ampdu_len),
 		MINSTREL_TRUNC(ci->avg_ampdu_len * 10) % 10);
 	cs->len = p - cs->buf;
