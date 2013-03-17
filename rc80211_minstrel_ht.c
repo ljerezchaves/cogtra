@@ -434,7 +434,6 @@ minstrel_ht_tx_status(void *priv, struct ieee80211_supported_band *sband,
 		info->status.ampdu_len = 1;
 	}
 
-	printk("Using %d\n",ar[0].idx);
 	mi->ampdu_packets++;
 	mi->ampdu_len += info->status.ampdu_len;
 
