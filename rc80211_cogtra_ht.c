@@ -511,7 +511,7 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_tx_rate *ar = info->status.rates;
 	struct minstrel_rate_stats *rate;
-	int i, last,group;
+	int i, last = 0,group;
  
 	if(!csp->is_ht){
 		return mac80211_cogtra.tx_status(priv,sband, sta, &csp->legacy,skb);
@@ -583,6 +583,7 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 
 	
 	/* Check the need of an update_stats based on update_interval */
+	printk("Update Counter: %lu\n Update Interval: %u\n",ci->update_counter,ci->update_interval);
 	if (ci->update_counter >= ci->update_interval)
 		cogtra_ht_update_stats (cp, ci);
 	
