@@ -125,10 +125,7 @@ const struct mcs_group minstrel_mcs_groups[] = {
 
 int groupFlag = 0; 
 
-static inline int
-cogtra_ht_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp, 
-		u32 curr_thp, unsigned int stdev)
-{
+static inline int cogtra_ht_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp, u32 curr_thp, unsigned int stdev) {
 	/* Check for more than 10% thp variation */
 	s32 delta = (s32)(last_thp / 10);
 	s32 diff = (s32)(curr_thp - last_thp);
@@ -139,11 +136,7 @@ cogtra_ht_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp,
 		return max (stdev - 10, (unsigned int) COGTRA_HT_MIN_STDEV);
 } 
 
-/* COGTRA_HT Normal random number generator. 
- * stdev parameter has to be stedv * 100 (to avoid FP operations) */
-static int
-rc80211_cogtra_ht_normal_generator (int mean, int stdev_times100)
-{
+static int rc80211_cogtra_ht_normal_generator (int mean, int stdev_times100) {
 	u32 rand = 0;
 	int value = 0;
 	int round_fac = 0;
@@ -264,10 +257,7 @@ static inline int minstrel_get_duration(int index) {
  * Calculate throughput based on the average A-MPDU length, taking into account
  * the expected number of retransmissions and their expected length
  */
-static void
-minstrel_ht_calc_tp(struct cogtra_priv *cp, struct cogtra_ht_sta *ci,
-                    int group, int rate)
-{
+static void minstrel_ht_calc_tp(struct cogtra_priv *cp, struct cogtra_ht_sta *ci, int group, int rate) {
 	struct minstrel_rate_stats *cr;
 	unsigned int usecs;
 
@@ -276,7 +266,7 @@ minstrel_ht_calc_tp(struct cogtra_priv *cp, struct cogtra_ht_sta *ci,
 	//if (mr->probability < MINSTREL_FRAC(1, 10)) {
 		//mr->cur_tp = 0;
 		//return;
-	//}
+	// }
 
 	usecs = ci->overhead / MINSTREL_TRUNC(ci->avg_ampdu_len);
 	usecs += minstrel_mcs_groups[group].duration[rate];
@@ -302,12 +292,7 @@ static inline struct minstrel_rate_stats * minstrel_get_ratestats(struct cogtra_
         return &ci->groups[index / MCS_GROUP_RATES].rates[index % MCS_GROUP_RATES];
 }
 
-/* cogtra_ht_update_stats is called by cogtra_ht_get_rate when the update_interval
- * expires. It sumarizes statistics information and use cogtra_ht core algorithm to
- * select the rate to be used during next interval. */
-static void
-cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
-{
+static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci) {
 	struct minstrel_mcs_group_data *cg;
     struct minstrel_rate_stats *cr;
 	
@@ -465,12 +450,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		}*/
 }
 
-/*
- * Look up an MCS group index based on mac80211 rate information
- */
-static int
-minstrel_ht_get_group_idx(struct ieee80211_tx_rate *rate)
-{
+static int minstrel_ht_get_group_idx(struct ieee80211_tx_rate *rate) {
 	int streams = (rate->idx / MCS_GROUP_RATES) + 1;
 	u32 flags = IEEE80211_TX_RC_SHORT_GI | IEEE80211_TX_RC_40_MHZ_WIDTH;
 	int i;
@@ -488,9 +468,7 @@ minstrel_ht_get_group_idx(struct ieee80211_tx_rate *rate)
 	return 0;
 }
 
-static bool
-minstrel_ht_txstat_valid(struct ieee80211_tx_rate *rate)
-{
+static bool minstrel_ht_txstat_valid(struct ieee80211_tx_rate *rate) {
 	if (!rate->count)
 		return false;
 
@@ -500,12 +478,7 @@ minstrel_ht_txstat_valid(struct ieee80211_tx_rate *rate)
 	return !!(rate->flags & IEEE80211_TX_RC_MCS);
 }
 
-/* cogtra_ht_tx_status is called just after frame tx and it is used to update
- * statistics information for the used rate */
-static void
-cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband, 
-		struct ieee80211_sta *sta, void *priv_sta, struct sk_buff *skb)
-{
+static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband, struct ieee80211_sta *sta, void *priv_sta, struct sk_buff *skb){
 	struct cogtra_ht_sta_priv *csp = priv_sta;
 	struct cogtra_ht_sta *ci = &csp->ht;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
@@ -523,15 +496,14 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 		return;
 
 	if (!(info->flags & IEEE80211_TX_STAT_AMPDU)) {
-		info->status.ampdu_ack_len =
-			(info->flags & IEEE80211_TX_STAT_ACK ? 1 : 0);
+		info->status.ampdu_ack_len = (info->flags & IEEE80211_TX_STAT_ACK ? 1 : 0);
 		info->status.ampdu_len = 1;
 	}
 	
 	ci->ampdu_packets++;
 	ci->ampdu_len += info->status.ampdu_len;
 	
-	for (i = 0; !last; i++) {
+	/*for (i = 0; !last; i++) {
 		last = (i == IEEE80211_TX_MAX_RATES - 1) ||
 		       !minstrel_ht_txstat_valid(&ar[i + 1]);
 
@@ -546,7 +518,32 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 
 		rate->attempts += ar[i].count * info->status.ampdu_len;
 		ci->update_counter += ar[i].count * info->status.ampdu_len;
+	}*/
+	
+	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
+	
+	
+		/* A rate idx -1 means that the following rates weren't used in tx */
+		if (ar[i].idx < 0)
+			break;
+			
+		group = minstrel_ht_get_group_idx(&ar[i]);
+		rate = &ci->groups[group].rates[ar[i].idx % 8];
+				
+		/* Increasing attempts counter */
+		rate->attempts += ar[i].count * info->status.ampdu_len;
+		ci->update_counter += ar[i].count * info->status.ampdu_len;
+		
+	
+		/* If it is the last used rate and resultesd in tx success, also
+		 * increse the success counter */
+		if ((i != IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) {
+			rate->success += info->status.ampdu_ack_len;
+		}
+		
+		printk("ar[%d] : idx %d | g:%d r:%d | count %u ampdu_len %u\n",i,ar[i].idx,group,ar[i].idx % 8,ar[i].count,info->status.ampdu_len );
 	}
+	printk("\n");
 
 }
 
@@ -554,9 +551,7 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 /* cogtra_ht_get_rate is called just before each frame tx and sets the appropriate
  * data rate to be used */
 static void
-cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
-		struct ieee80211_tx_rate_control *txrc)
-{
+cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta, struct ieee80211_tx_rate_control *txrc) {
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(txrc->skb);
 	struct ieee80211_tx_rate *ar = info->control.rates;
 	struct cogtra_ht_sta_priv *csp = priv_sta;
@@ -609,10 +604,7 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 /* cogtra_ht_rate_init is called after cogtra_ht_alloc_sta to check and populate
  * information for supported rates */
 static void
-cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
-		struct ieee80211_sta *sta, void *priv_sta,
-		enum nl80211_channel_type oper_chan_type)
-{
+cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband, struct ieee80211_sta *sta, void *priv_sta, enum nl80211_channel_type oper_chan_type) {
 	struct cogtra_ht_sta_priv *csp = priv_sta;
 	struct cogtra_priv *cp = priv;
 	struct cogtra_ht_sta *ci = &csp->ht;
@@ -698,25 +690,19 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 }
 
 static void
-cogtra_ht_rate_init (void *priv, struct ieee80211_supported_band *sband,
-		struct ieee80211_sta *sta, void *priv_sta)
-{
+cogtra_ht_rate_init (void *priv, struct ieee80211_supported_band *sband, struct ieee80211_sta *sta, void *priv_sta) {
 	struct cogtra_priv *cp = priv;
 	cogtra_ht_update_caps(priv, sband, sta, priv_sta, cp->hw->conf.channel_type);
 }
 
 static void
-cogtra_ht_rate_update (void *priv, struct ieee80211_supported_band *sband,
-		struct ieee80211_sta *sta, void *priv_sta,
-		u32 changed, enum nl80211_channel_type oper_chan_type)
-{
+cogtra_ht_rate_update (void *priv, struct ieee80211_supported_band *sband, struct ieee80211_sta *sta, void *priv_sta, u32 changed, enum nl80211_channel_type oper_chan_type) {
 	cogtra_ht_update_caps(priv, sband, sta, priv_sta, oper_chan_type);
 }
 
 /* cogtra_ht_alloc_sta is called every time a new station joins the networks */
 static void *
-cogtra_ht_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
-{
+cogtra_ht_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp) {
 	struct ieee80211_supported_band *sband;
 	struct cogtra_ht_sta_priv *csp;
 	struct cogtra_priv *cp = priv;
@@ -757,8 +743,7 @@ cogtra_ht_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 
 /* cogtra_ht_free_sta used to release memory when a station leaves the network */
 static void
-cogtra_ht_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
-{
+cogtra_ht_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta) {
 	struct cogtra_ht_sta_priv *csp = priv_sta;
 
 	kfree (csp->t);
@@ -769,16 +754,14 @@ cogtra_ht_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 
 /* chama o alloc do cogtra */
 static void *
-cogtra_ht_alloc (struct ieee80211_hw *hw, struct dentry *debugfsdir)
-{
+cogtra_ht_alloc (struct ieee80211_hw *hw, struct dentry *debugfsdir) {
 	return mac80211_cogtra.alloc(hw, debugfsdir);
 }
 
 
 /* cogtra_ht_free called once before turning off the wireless interface */
 static void
-cogtra_ht_free (void *priv)
-{
+cogtra_ht_free (void *priv){
 	kfree (priv);
 }
 
