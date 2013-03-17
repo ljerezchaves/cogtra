@@ -259,7 +259,7 @@ static inline int minstrel_get_duration(int index) {
  */
 static void minstrel_ht_calc_tp(struct cogtra_priv *cp, struct cogtra_ht_sta *ci, int group, int rate) {
 	struct minstrel_rate_stats *cr;
-	unsigned int usecs;
+	u32 usecs;
 
 	cr = &ci->groups[group].rates[rate];
 
@@ -270,7 +270,9 @@ static void minstrel_ht_calc_tp(struct cogtra_priv *cp, struct cogtra_ht_sta *ci
 
 	usecs = ci->overhead / MINSTREL_TRUNC(ci->avg_ampdu_len);
 	usecs += minstrel_mcs_groups[group].duration[rate];
-	cr->cur_tp = MINSTREL_TRUNC((1000000 / usecs) * cr->cur_prob); //USar a média ou a curr_prob??
+	cr->cur_tp = (1000000 / usecs) * cr->cur_prob; // E O MISNTREL TRUNC?? USar a média ou a curr_prob??
+	
+	printk("cur_tp: %u\n",cr->cur_tp );
 }
 
 static void cogtra_ht_set_rate(struct ieee80211_tx_rate *rate, int index){
@@ -349,7 +351,11 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 				/* Update thp and prob for last interval */
 				cr->cur_prob 	= (cr->success * 1800) / cr->attempts;
 				minstrel_ht_calc_tp(cp, ci, i, j);
-
+				
+				usecs += ci->overhead / MINSTREL_TRUNC(ci->avg_ampdu_len);
+				cr->cur_tp = (1000000 / usecs) * cr->cur_prob;
+				printk("cur_tp: %u\n",cr->cur_tp );
+				
 				/* Update average thp and prob with EWMA */
 				cr->avg_prob = cr->avg_prob ? ((cr->cur_prob * (100 -
 						cp->ewma_level)) + (cr->avg_prob * cp->ewma_level)) / 100 :
@@ -431,11 +437,11 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 			max_prob_rate = cg->max_prob_rate_gix;
 		}	
 	}
-		//ERRO
+		//FIXME
 		ci->random_rate_mcs = (random_rate_gix * MCS_GROUP_RATES) + random_rt;
 		ci->max_tp_rate_mcs = (max_tp_rate_gix * MCS_GROUP_RATES) + max_tp_rate;
 		ci->max_prob_rate_mcs = (max_prob_rate_gix * MCS_GROUP_RATES) + max_prob_rate;
-		
+		ci->update_counter = 0UL;
 
 		cogtra_ht_tx_rate_populate (ci);
 
