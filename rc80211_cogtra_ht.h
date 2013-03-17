@@ -100,11 +100,16 @@ struct cogtra_ht_sta{
 
 	struct ieee80211_tx_rate tx_rates[4];
 
+	/* overhead time in usec for each frame */
 	unsigned int overhead;
 	unsigned int overhead_rtscts;
-	unsigned int ampdu_packets;
-	unsigned int avg_ampdu_len;
+	
+	/* ampdu length (average, per sampling interval) */
 	unsigned int ampdu_len;
+	unsigned int ampdu_packets;
+
+	/* ampdu length (EWMA) */
+	unsigned int avg_ampdu_len;
 
 	//unsigned int cur_stdev;			// current normal stdev
 	unsigned int random_rate_mcs;		// random mcs index (will be used in the next interval)  //0 a 
@@ -118,7 +123,9 @@ struct cogtra_ht_sta{
     unsigned int update_interval; 		// time (or pkts) between cogtra_ht_update_stats
 	unsigned long up_stats_counter;		// update stats counter
 
+	/* tx flags to add for frames for this sta */
 	u32 tx_flags;
+		
 	struct minstrel_mcs_group_data groups[MINSTREL_MAX_STREAMS * MINSTREL_STREAM_GROUPS];
 #ifdef CONFIG_MAC80211_DEBUGFS
 	struct dentry *dbg_stats;		// debug file pointer 

@@ -518,6 +518,7 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 		return mac80211_cogtra.tx_status(priv,sband, sta, &csp->legacy,skb);
 	}
 
+	/* This packet was aggregated but doesn't carry status info */
 	if ((info->flags & IEEE80211_TX_CTL_AMPDU) &&
 	    !(info->flags & IEEE80211_TX_STAT_AMPDU))
 		return;
@@ -527,6 +528,7 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 			(info->flags & IEEE80211_TX_STAT_ACK ? 1 : 0);
 		info->status.ampdu_len = 1;
 	}
+	
 	ci->ampdu_packets++;
 	ci->ampdu_len += info->status.ampdu_len;
 	
@@ -544,6 +546,7 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 			rate->success += info->status.ampdu_ack_len;
 
 		rate->attempts += ar[i].count * info->status.ampdu_len;
+		ci->update_counter += ar[i].count * info->status.ampdu_len;
 	}
 
 }
@@ -555,14 +558,15 @@ static void
 cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 		struct ieee80211_tx_rate_control *txrc)
 {
-	struct sk_buff *skb = txrc->skb;
-	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
+	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(txrc->skb);
+	struct ieee80211_tx_rate *ar = info->control.rates;
 	struct cogtra_ht_sta_priv *csp = priv_sta;
 	struct cogtra_ht_sta *ci = &csp->ht;
 	struct cogtra_priv *cp = priv;
-	struct ieee80211_tx_rate *ar = info->control.rates;
+	
 	bool mrr;
-	int i;
+	int i;	
+	
 	
 	/* Check for management or control packet, which should be transmitted
 	 * unsing lower rate */
@@ -572,6 +576,9 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	if(!csp->is_ht){
 		return mac80211_cogtra.get_rate(priv, sta, &csp->legacy, txrc);
 	}
+	
+	info->flags |= mi->tx_flags;
+	
 	/* Check MRR hardware support */
 	mrr = cp->has_mrr && !txrc->rts && !txrc->bss_conf->use_cts_prot;
 
@@ -795,7 +802,6 @@ struct rate_control_ops mac80211_cogtra_ht = {
 int __init
 rc80211_cogtra_ht_init(void)
 {
-	int i;
 	printk ("LJC CogTRA_HT algorithm.\n");
 	return ieee80211_rate_control_register (&mac80211_cogtra_ht);
 }
