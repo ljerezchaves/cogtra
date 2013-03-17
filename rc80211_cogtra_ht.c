@@ -511,8 +511,7 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_tx_rate *ar = info->status.rates;
 	struct minstrel_rate_stats *rate;
-	int i, ndx,last,group;
-	int success;
+	int i, last,group;
  
 	if(!csp->is_ht){
 		return mac80211_cogtra.tx_status(priv,sband, sta, &csp->legacy,skb);
@@ -577,7 +576,7 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 		return mac80211_cogtra.get_rate(priv, sta, &csp->legacy, txrc);
 	}
 	
-	info->flags |= mi->tx_flags;
+	info->flags |= ci->tx_flags;
 	
 	/* Check MRR hardware support */
 	mrr = cp->has_mrr && !txrc->rts && !txrc->bss_conf->use_cts_prot;
@@ -618,9 +617,8 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 	struct cogtra_ht_sta *ci = &csp->ht;
 	struct ieee80211_mcs_info *mcs = &sta->ht_cap.mcs;
 	struct ieee80211_local *local = hw_to_local(cp->hw);
-	struct ieee80211_rate *ctl_rate;//r
 	u16 sta_cap = sta->ht_cap.cap;
-	unsigned int i, n = 0;
+	unsigned int i = 0;
 	int n_supported = 0;
 	int ack_dur;
 	int stbc;
