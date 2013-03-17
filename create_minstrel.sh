@@ -16,12 +16,6 @@ cp /home/brunoguic/openwrt/bin/ar71xx/packages/kmod-cfg* /home/brunoguic/Downloa
 cp /home/brunoguic/openwrt/bin/ar71xx/packages/kmod-mac* /home/brunoguic/Downloads/minstrel/
 
 
-ssh rspro 'rm kmod*;exit'
-
 scp /home/brunoguic/openwrt/bin/ar71xx/packages/kmod-ath* rspro:~/minstrel/
 scp /home/brunoguic/openwrt/bin/ar71xx/packages/kmod-cfg* rspro:~/minstrel/
 scp /home/brunoguic/openwrt/bin/ar71xx/packages/kmod-mac* rspro:~/minstrel/
-
-ssh rspro 'cd minstrel;./install;exit'
-
-ssh rspro

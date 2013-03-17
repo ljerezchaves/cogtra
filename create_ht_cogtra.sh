@@ -18,5 +18,3 @@ cp /home/brunoguic/openwrt/bin/ar71xx/packages/kmod-mac* /home/brunoguic/Downloa
 scp /home/brunoguic/openwrt/bin/ar71xx/packages/kmod-ath* rspro:~/cogtra_ht/
 scp /home/brunoguic/openwrt/bin/ar71xx/packages/kmod-cfg* rspro:~/cogtra_ht/
 scp /home/brunoguic/openwrt/bin/ar71xx/packages/kmod-mac* rspro:~/cogtra_ht/
-
-ssh rspro
