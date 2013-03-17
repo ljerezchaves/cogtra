@@ -272,7 +272,7 @@ static void minstrel_ht_calc_tp(struct cogtra_priv *cp, struct cogtra_ht_sta *ci
 	usecs += minstrel_mcs_groups[group].duration[rate];
 	cr->cur_tp = (1000000 / usecs) * cr->cur_prob; // E O MISNTREL TRUNC?? USar a média ou a curr_prob??
 	
-	printk("cur_tp: %u\n",cr->cur_tp );
+	//printk("cur_tp: %u\n",cr->cur_tp );
 }
 
 static void cogtra_ht_set_rate(struct ieee80211_tx_rate *rate, int index){
@@ -350,11 +350,10 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 
 				/* Update thp and prob for last interval */
 				cr->cur_prob 	= (cr->success * 1800) / cr->attempts;
-				minstrel_ht_calc_tp(cp, ci, i, j);
 				
 				usecs += ci->overhead / MINSTREL_TRUNC(ci->avg_ampdu_len);
 				cr->cur_tp = (1000000 / usecs) * cr->cur_prob;
-				printk("cur_tp: %u\n",cr->cur_tp );
+				//printk("cur_tp: %u\n",cr->cur_tp );
 				
 				/* Update average thp and prob with EWMA */
 				cr->avg_prob = cr->avg_prob ? ((cr->cur_prob * (100 -
@@ -547,9 +546,9 @@ static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sb
 			rate->success += info->status.ampdu_ack_len;
 		}
 		
-		printk("ar[%d] : idx %d | g:%d r:%d | count %u ampdu_len %u\n",i,ar[i].idx,group,ar[i].idx % 8,ar[i].count,info->status.ampdu_len );
+		//printk("ar[%d] : idx %d | g:%d r:%d | count %u ampdu_len %u\n",i,ar[i].idx,group,ar[i].idx % 8,ar[i].count,info->status.ampdu_len );
 	}
-	printk("\n");
+	//printk("\n");
 
 }
 
@@ -584,7 +583,7 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta, struc
 
 	
 	/* Check the need of an update_stats based on update_interval */
-	printk("Update Counter: %lu\n Update Interval: %u\n",ci->update_counter,ci->update_interval);
+	//printk("Update Counter: %lu\n Update Interval: %u\n",ci->update_counter,ci->update_interval);
 	if (ci->update_counter >= ci->update_interval)
 		cogtra_ht_update_stats (cp, ci);
 	
