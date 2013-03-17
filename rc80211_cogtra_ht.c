@@ -133,7 +133,6 @@ cogtra_ht_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp,
 	s32 delta = (s32)(last_thp / 10);
 	s32 diff = (s32)(curr_thp - last_thp);
 	
-	//printk("HR: _aaa\n");
 	if (abs (diff) > delta)
 		return min (stdev + 10, (unsigned int) COGTRA_HT_MAX_STDEV);
 	else
@@ -150,7 +149,6 @@ rc80211_cogtra_ht_normal_generator (int mean, int stdev_times100)
 	int round_fac = 0;
 	unsigned int i = 0;
 
-	//printk("HR: _normal_generator\n");
 	/* Convolution method to generate random normal numbers
 	 * Refer to "Raj Jain", "The art of computer systems performance analysis",
 	 * 1 edition, page 494.
@@ -298,10 +296,6 @@ static void cogtra_ht_tx_rate_populate(struct cogtra_ht_sta *ci) {
 	cogtra_ht_set_rate(&ci->tx_rates[1], ci->max_tp_rate_mcs);
 	cogtra_ht_set_rate(&ci->tx_rates[2], ci->max_prob_rate_mcs);
 	cogtra_ht_set_rate(&ci->tx_rates[3], 0);
-	//printk("rates %u\n",ci->random_rate_mcs);
-	//printk("rates %u\n",ci->max_tp_rate_mcs);
-	//printk("rates %u\n",ci->max_prob_rate_mcs);
-	//printk("------------\n");
 }
 
 static inline struct minstrel_rate_stats * minstrel_get_ratestats(struct cogtra_ht_sta *ci, int index){
@@ -323,7 +317,6 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 	
 	int i,j;
 	
-	//printk("HR: _update_stats\n");
 	ci->up_stats_counter++;
 	
 	if (ci->ampdu_packets > 0) {
@@ -356,7 +349,6 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		cg->max_prob_rate_gix = 0;
 
 		for (j = 0; j < MCS_GROUP_RATES; j++) {
-			//printk("OK %d\n",j);
 			if (!(cg->supported & BIT(j)))
 			continue;
 			
@@ -383,14 +375,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 				/* Update success and attempt counters */
 				cr->succ_hist += cr->success;
 				cr->att_hist += cr->attempts;
-				
-				//printk("RATE %d\n",j);
-				//printk("Rate usec %u\n",usecs);
-				//printk("Rate attempts %u\n",cr->attempts);
-				//printk("Rate succes %u\n",cr->success);		
-				//printk("Rate tp %u\n",cr->cur_tp);
-				//printk("Rate prob %u\n",cr->cur_prob);
-				//printk("-----------------------\n");
+			
 			}
 
 			/* Update success and attempt counters */
@@ -427,13 +412,6 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		cg->random_rate_gix = (unsigned int)(max (0, min (random_gix,
 						(int)((int)(MCS_GROUP_RATES) - 1))));
 		cg->rates[cg->random_rate_gix].times_called++;
-	//printk("GROUP %d\n",i);
-	//printk("Using random_gix %d (%u)\n",random_gix,random_gix);
-	//printk("Using cur_stdev %u\n",cg->cur_stdev);
-	//printk("Using random_rate %u\n",cg->random_rate_gix);		
-	//printk("Using max tp %u\n",cg->max_tp_rate_gix);
-	//printk("Using max prob %u\n",cg->max_prob_rate_gix);
-	//printk("-----------------------\n");
 		
 	}
 	
@@ -446,12 +424,10 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		if(groupFlag == 0){
 			random_rate_gix = 0;
 			random_rt = ci->groups[0].random_rate_gix;
-			//printk("Principal random %d - %u\n", i, random_rt);
 			groupFlag = 1;
 		}else{
 			random_rate_gix = 1;
 			random_rt = ci->groups[1].random_rate_gix;
-			//printk("Principal random %d - %u\n", i, random_rt);
 			groupFlag = 0;
 		}
 			
@@ -464,7 +440,6 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		if (max_tp_rate < cg->rates[max_tp_rate_gix].avg_tp) {
 			max_tp_rate_gix = i;
 			max_tp_rate = cg->max_tp_rate_gix;
-			//printk("Principal tp %d - %u\n", i, max_tp_rate);
 		}
 		if (max_prob_rate < cg->rates[max_prob_rate_gix].avg_prob) {
 			max_prob_rate_gix = i;
@@ -476,14 +451,7 @@ cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta *ci)
 		ci->max_tp_rate_mcs = (max_tp_rate_gix * MCS_GROUP_RATES) + max_tp_rate;
 		ci->max_prob_rate_mcs = (max_prob_rate_gix * MCS_GROUP_RATES) + max_prob_rate;
 		
-	//printk("FINALLY \n");
-	//printk("before MCS random_rate %u\n",random_rt);		
-	//printk("before MCS max tp %u\n",max_tp_rate);
-	//printk("before MCS max prob %u\n",max_prob_rate);
-	//printk("MCS random_rate %u\n",ci->random_rate_mcs);		
-	//printk("MCS max tp %u\n",ci->max_tp_rate_mcs);
-	//printk("MCS max prob %u\n",ci->max_prob_rate_mcs);
-	//printk("-----------------------\n");
+
 		cogtra_ht_tx_rate_populate (ci);
 
 		/* Adjust update_interval dependending on the random rate */
@@ -546,13 +514,10 @@ cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	int i, ndx,last,group;
 	int success;
  
-	//printk("HR: _tx_status");
 	if(!csp->is_ht){
-		//printk(" -> Legacy\n");
 		return mac80211_cogtra.tx_status(priv,sband, sta, &csp->legacy,skb);
 	}
-	//printk(" -> HT\n");
-	
+
 	if ((info->flags & IEEE80211_TX_CTL_AMPDU) &&
 	    !(info->flags & IEEE80211_TX_STAT_AMPDU))
 		return;
@@ -604,12 +569,9 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	if (rate_control_send_low (sta, priv_sta, txrc))
 		return;
 
-	//printk ("HR: _get_rate");
 	if(!csp->is_ht){
-		//printk(" -> Legacy\n");
 		return mac80211_cogtra.get_rate(priv, sta, &csp->legacy, txrc);
 	}
-	//printk(" -> HT\n");
 	/* Check MRR hardware support */
 	mrr = cp->has_mrr && !txrc->rts && !txrc->bss_conf->use_cts_prot;
 
@@ -656,17 +618,14 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 	int ack_dur;
 	int stbc;
 
-	//printk("HR: _update_caps()");
 	/* fall back to the old cogtra for legacy stations */
 	if(!sta->ht_cap.ht_supported){
-		//printk(" -> Legacy\n");
 		csp->is_ht = false;
 		memset(&csp->legacy, 0, sizeof(csp->legacy));
 		csp->legacy.r = csp->r;
 		csp->legacy.t = csp->t;
 		return mac80211_cogtra.rate_init(priv,sband,sta,&csp->legacy);
 	}
-	//printk(" -> HT\n");
 
 	csp->is_ht = true;
 	memset(ci,0,sizeof(*ci));
@@ -714,9 +673,7 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband,
 		}
 	}
 
-	//printk("n_supported:%d",n_supported);
 	if (!n_supported){
-		//printk(" -> Legacy\n");
 		csp->is_ht = false;
 		memset(&csp->legacy, 0, sizeof(csp->legacy));
 		csp->legacy.r = csp->r;
@@ -739,7 +696,6 @@ cogtra_ht_rate_init (void *priv, struct ieee80211_supported_band *sband,
 		struct ieee80211_sta *sta, void *priv_sta)
 {
 	struct cogtra_priv *cp = priv;
-	//printk("HR: _rate_init()\n");
 	cogtra_ht_update_caps(priv, sband, sta, priv_sta, cp->hw->conf.channel_type);
 }
 
@@ -748,7 +704,6 @@ cogtra_ht_rate_update (void *priv, struct ieee80211_supported_band *sband,
 		struct ieee80211_sta *sta, void *priv_sta,
 		u32 changed, enum nl80211_channel_type oper_chan_type)
 {
-	//printk("HR: _rate_update()\n");
 	cogtra_ht_update_caps(priv, sband, sta, priv_sta, oper_chan_type);
 }
 
@@ -763,7 +718,7 @@ cogtra_ht_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 	int max_rates = 0;
 	int i;
 
-	//printk("HR: _alloc_sta()\n");
+
 	csp = kzalloc (sizeof (struct cogtra_ht_sta_priv), gfp);
 	if (!csp)
 		return NULL;
@@ -800,7 +755,6 @@ cogtra_ht_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 {
 	struct cogtra_ht_sta_priv *csp = priv_sta;
 
-	//printk("HR: _free_sta()\n");
 	kfree (csp->t);
 	kfree (csp->r);
 	kfree (csp);
@@ -811,7 +765,6 @@ cogtra_ht_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 static void *
 cogtra_ht_alloc (struct ieee80211_hw *hw, struct dentry *debugfsdir)
 {
-	//printk("HR: _alloc()\n");
 	return mac80211_cogtra.alloc(hw, debugfsdir);
 }
 
