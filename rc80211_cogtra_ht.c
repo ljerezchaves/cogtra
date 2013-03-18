@@ -498,6 +498,7 @@ static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sb
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_tx_rate *ar = info->status.rates;
 	struct minstrel_rate_stats *rate;
+	struct cogtra_priv *cp = priv;
 	int i, last = 0,group;
  
 	if(!csp->is_ht){
@@ -547,7 +548,7 @@ static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sb
 	if (ci->update_counter >= ci->update_interval)
 		cogtra_ht_update_stats (cp, ci);
 		if (!(info->flags & IEEE80211_TX_CTL_AMPDU))
-			minstrel_aggr_check(mp, mi, sta, skb);
+			minstrel_aggr_check(cp, ci, sta, skb);
 	
 }
 
