@@ -436,7 +436,6 @@ minstrel_ht_tx_status(void *priv, struct ieee80211_supported_band *sband,
 
 	mi->ampdu_packets++;
 	mi->ampdu_len += info->status.ampdu_len;
-
 	if (!mi->sample_wait && !mi->sample_tries && mi->sample_count > 0) {
 		mi->sample_wait = 16 + 2 * MINSTREL_TRUNC(mi->avg_ampdu_len);
 		mi->sample_tries = 2;

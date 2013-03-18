@@ -253,28 +253,6 @@ static inline int minstrel_get_duration(int index) {
 }*/
 
 
-/*
- * Calculate throughput based on the average A-MPDU length, taking into account
- * the expected number of retransmissions and their expected length
- */
-static void minstrel_ht_calc_tp(struct cogtra_priv *cp, struct cogtra_ht_sta *ci, int group, int rate) {
-	struct minstrel_rate_stats *cr;
-	u32 usecs;
-
-	cr = &ci->groups[group].rates[rate];
-
-	//if (mr->probability < MINSTREL_FRAC(1, 10)) {
-		//mr->cur_tp = 0;
-		//return;
-	// }
-
-	usecs = ci->overhead / MINSTREL_TRUNC(ci->avg_ampdu_len);
-	usecs += minstrel_mcs_groups[group].duration[rate];
-	cr->cur_tp = (1000000 / usecs) * cr->cur_prob; // E O MISNTREL TRUNC?? USar a média ou a curr_prob??
-	
-	//printk("cur_tp: %u\n",cr->cur_tp );
-}
-
 static void cogtra_ht_set_rate(struct ieee80211_tx_rate *rate, int index){
     const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
     //rate->idx = index % MCS_GROUP_RATES + (group->streams - 1) * MCS_GROUP_RATES;
@@ -353,12 +331,10 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 				
 				usecs += ci->overhead / MINSTREL_TRUNC(ci->avg_ampdu_len);
 				cr->cur_tp = (1000000 / usecs) * cr->cur_prob;
-				//printk("cur_tp: %u\n",cr->cur_tp );
 				
 				/* Update average thp and prob with EWMA */
-				cr->avg_prob = cr->avg_prob ? ((cr->cur_prob * (100 -
-						cp->ewma_level)) + (cr->avg_prob * cp->ewma_level)) / 100 :
-						cr->cur_prob;
+				cr->avg_prob = cr->avg_prob ? ((cr->cur_prob * (100 - cp->ewma_level)) + 
+						(cr->avg_prob * cp->ewma_level)) / 100 : cr->cur_prob;
 				cr->avg_tp = cr->avg_tp ? ((cr->cur_tp * (100 - cp->ewma_level)) +
 						(cr->avg_tp * cp->ewma_level)) / 100 : cr->cur_tp;
 
@@ -496,10 +472,12 @@ static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sb
 	}
 
 	/* This packet was aggregated but doesn't carry status info */
-	if ((info->flags & IEEE80211_TX_CTL_AMPDU) &&
-	    !(info->flags & IEEE80211_TX_STAT_AMPDU))
+	if ((info->flags & IEEE80211_TX_CTL_AMPDU) &&  !(info->flags & IEEE80211_TX_STAT_AMPDU))
 		return;
 
+	//IEEE80211_TX_STAT_AMPDU - se o pacote foi agregado
+	//IEEE80211_TX_CTL_AMPDU - enviado como parte de um AMPDU
+	//IEEE80211_TX_STAT_ACK - foi aceito
 	if (!(info->flags & IEEE80211_TX_STAT_AMPDU)) {
 		info->status.ampdu_ack_len = (info->flags & IEEE80211_TX_STAT_ACK ? 1 : 0);
 		info->status.ampdu_len = 1;
@@ -507,26 +485,8 @@ static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sb
 	
 	ci->ampdu_packets++;
 	ci->ampdu_len += info->status.ampdu_len;
-	
-	/*for (i = 0; !last; i++) {
-		last = (i == IEEE80211_TX_MAX_RATES - 1) ||
-		       !minstrel_ht_txstat_valid(&ar[i + 1]);
-
-		if (!minstrel_ht_txstat_valid(&ar[i]))
-			break;
-
-		group = minstrel_ht_get_group_idx(&ar[i]);
-		rate = &ci->groups[group].rates[ar[i].idx % 8];
-
-		if (last)
-			rate->success += info->status.ampdu_ack_len;
-
-		rate->attempts += ar[i].count * info->status.ampdu_len;
-		ci->update_counter += ar[i].count * info->status.ampdu_len;
-	}*/
-	
+		
 	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
-	
 	
 		/* A rate idx -1 means that the following rates weren't used in tx */
 		if (ar[i].idx < 0)
@@ -537,19 +497,17 @@ static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sb
 				
 		/* Increasing attempts counter */
 		rate->attempts += ar[i].count * info->status.ampdu_len;
-		ci->update_counter += ar[i].count * info->status.ampdu_len;
+		ci->update_counter += ar[i].count * info->status.ampdu_len; //ampdu_len: number of aggregated frames. relevant only if IEEE80211_TX_STAT_AMPDU was set.
+
 		
 	
 		/* If it is the last used rate and resultesd in tx success, also
 		 * increse the success counter */
 		if ((i != IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) {
-			rate->success += info->status.ampdu_ack_len;
+			rate->success += info->status.ampdu_ack_len; // number of acked aggregated frames. relevant only if IEEE80211_TX_STAT_AMPDU was set.
 		}
 		
-		//printk("ar[%d] : idx %d | g:%d r:%d | count %u ampdu_len %u\n",i,ar[i].idx,group,ar[i].idx % 8,ar[i].count,info->status.ampdu_len );
 	}
-	//printk("\n");
-
 }
 
 
