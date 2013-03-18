@@ -401,11 +401,11 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 		random_rate_gix = rc80211_cogtra_ht_normal_generator((int)ci->max_tp_rate_mcs, (int)150) / 8;
 		random_rate_gix = (unsigned int) ( max( 0 , min( (int)random_rate_gix, (int)((int) ci->n_groups - 1))));
 		/* Get a new random of internal group */
-		random_gix = rc80211_cogtra_ht_normal_generator ((int)ci->groups[random_rate_gix].max_tp_rate_gix, (int) ci->groups[random_rate_gix].cur_stdev);
-		ci->groups[random_rate_gix].random_rate_gix = (unsigned int)(max (0, min (random_gix, (int)((int)(MCS_GROUP_RATES) - 1))));
-		ci->groups[random_rate_gix].rates[cg->random_rate_gix].times_called++;
+		random_rt = rc80211_cogtra_ht_normal_generator ((int)ci->groups[random_rate_gix].max_tp_rate_gix, (int) ci->groups[random_rate_gix].cur_stdev);
+		random_rt = (unsigned int)(max (0, min (random_rt, (int)((int)(MCS_GROUP_RATES) - 1))));
+		ci->groups[random_rate_gix].random_rate_gix = random_rt;
+		ci->groups[random_rate_gix].rates[random_rt].times_called++;
 		//Get the MCS of random
-		random_rt = ci->groups[random_rate_gix].random_rate_gix;
 		ci->random_rate_mcs = (random_rate_gix * MCS_GROUP_RATES) + random_rt;
 		
 		
