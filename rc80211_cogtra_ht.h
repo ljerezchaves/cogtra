@@ -127,6 +127,8 @@ struct cogtra_ht_sta{
 	u32 tx_flags;
 		
 	struct minstrel_mcs_group_data groups[MINSTREL_MAX_STREAMS * MINSTREL_STREAM_GROUPS];
+	
+	unsigned long last_aggr_start_time[IEEE80211_QOS_CTL_TID_MASK + 1];
 #ifdef CONFIG_MAC80211_DEBUGFS
 	struct dentry *dbg_stats;		// debug file pointer 
 #endif

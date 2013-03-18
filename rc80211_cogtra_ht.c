@@ -293,7 +293,7 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 	ci->up_stats_counter++;
 	
 	if (ci->ampdu_packets > 0) {
-		ci->avg_ampdu_len = ((MINSTREL_FRAC(ci->ampdu_len, ci->ampdu_packets) * (100 - cp->ewma_level)) + (ci->avg_ampdu_len * cp->ewma_level)) / 100;
+		ci->avg_ampdu_len = (MINSTREL_FRAC(ci->ampdu_len, ci->ampdu_packets) * (100 - cp->ewma_level)  +  ci->avg_ampdu_len * cp->ewma_level) / 100;
 		ci->ampdu_len = 0;
 		ci->ampdu_packets = 0;
 	}
@@ -461,6 +461,37 @@ static bool minstrel_ht_txstat_valid(struct ieee80211_tx_rate *rate) {
 	return !!(rate->flags & IEEE80211_TX_RC_MCS);
 }
 
+static void
+minstrel_aggr_check(struct cogtra_priv *cp, struct cogtra_ht_sta *ci,
+		    struct ieee80211_sta *pubsta, struct sk_buff *skb)
+{
+	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
+	struct sta_info *sta = container_of(pubsta, struct sta_info, sta);
+	unsigned long t1, t2;
+	u16 tid;
+
+	if (unlikely(!ieee80211_is_data_qos(hdr->frame_control)))
+		return;
+
+	if (unlikely(skb->protocol == cpu_to_be16(ETH_P_PAE)))
+		return;
+
+	tid = *ieee80211_get_qos_ctl(hdr) & IEEE80211_QOS_CTL_TID_MASK;
+	if (likely(sta->ampdu_mlme.tid_tx[tid]))
+		return;
+
+	if (skb_get_queue_mapping(skb) == IEEE80211_AC_VO)
+		return;
+
+	t1 = ci->last_aggr_start_time[tid];
+	t2 = t1 + msecs_to_jiffies(5000);
+	if (unlikely(time_in_range(jiffies, t1, t2)))
+		return;
+
+	ci->last_aggr_start_time[tid] = jiffies;
+	ieee80211_start_tx_ba_session(pubsta, tid, 5000);
+}
+
 static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sband, struct ieee80211_sta *sta, void *priv_sta, struct sk_buff *skb){
 	struct cogtra_ht_sta_priv *csp = priv_sta;
 	struct cogtra_ht_sta *ci = &csp->ht;
@@ -511,6 +542,13 @@ static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sb
 		}
 		
 	}
+	
+	/* Check the need of an update_stats based on update_interval */
+	if (ci->update_counter >= ci->update_interval)
+		cogtra_ht_update_stats (cp, ci);
+		if (!(info->flags & IEEE80211_TX_CTL_AMPDU))
+			minstrel_aggr_check(mp, mi, sta, skb);
+	
 }
 
 
@@ -542,10 +580,6 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta, struc
 	/* Check MRR hardware support */
 	mrr = cp->has_mrr && !txrc->rts && !txrc->bss_conf->use_cts_prot;
 
-	
-	/* Check the need of an update_stats based on update_interval */
-	if (ci->update_counter >= ci->update_interval)
-		cogtra_ht_update_stats (cp, ci);
 	
 	if (!mrr) {
 		ar[0] = ci->tx_rates[0];
