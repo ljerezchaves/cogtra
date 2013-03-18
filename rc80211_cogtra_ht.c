@@ -582,7 +582,7 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband, struc
 		return mac80211_cogtra.rate_init(priv,sband,sta,&csp->legacy);
 	}
 
-	csp->is_ht = true;
+	csp->is_ht = false;
 	memset(ci,0,sizeof(*ci));
 
 	ack_dur = ieee80211_frame_duration(local, 10, 60, 1, 1);
