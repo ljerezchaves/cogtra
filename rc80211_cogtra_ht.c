@@ -288,6 +288,7 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 		ci->avg_ampdu_len = ((MINSTREL_FRAC(ci->ampdu_len, ci->ampdu_packets) * (100 - cp->ewma_level)) + (ci->avg_ampdu_len * cp->ewma_level)) / 100;
 		ci->ampdu_len = 0;
 		ci->ampdu_packets = 0;
+		printk("avg%u \n",ci->avg_ampdu_len );
 	}
 
 	/* For each supported rate... */
@@ -485,7 +486,7 @@ static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sb
 	
 	ci->ampdu_packets++;
 	ci->ampdu_len += info->status.ampdu_len;
-		
+	printk("pack:%u | len:%u \n",ci->ampdu_packets,ci->ampdu_len );
 	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
 	
 		/* A rate idx -1 means that the following rates weren't used in tx */
