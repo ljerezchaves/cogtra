@@ -515,8 +515,6 @@ static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sb
 	if (!(info->flags & IEEE80211_TX_STAT_AMPDU)) {
 		info->status.ampdu_ack_len = (info->flags & IEEE80211_TX_STAT_ACK ? 1 : 0);
 		info->status.ampdu_len = 1;
-	}else{
-		printk("not len %u\n ",info->status.ampdu_len );
 	}
 	
 	ci->ampdu_packets++;
