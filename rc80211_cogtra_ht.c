@@ -416,8 +416,8 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 		/* Adjust update_interval dependending on the random rate */
 		/* RANDOM < BEST || RANDOM.PROB < 10% */
 		cr = minstrel_get_ratestats(ci,ci->random_rate_mcs);
-		if ( minstrel_mcs_groups[random_rate_gix].duration[random_rt] > minstrel_mcs_groups[max_tp_rate_gix].duration[max_tp_rate]) || 
-			(ci->groups[random_rate_gix].rates[random_rt].avg_prob < 180)){
+		if (( minstrel_mcs_groups[random_rate_gix].duration[random_rt] > minstrel_mcs_groups[max_tp_rate_gix].duration[max_tp_rate]) || 
+(ci->groups[random_rate_gix].rates[random_rt].avg_prob < 180)){
 			ci->update_interval = COGTRA_HT_RECOVERY_INTERVAL;
 			printk("r:%u | t:%u\n", ci->random_rate_mcs,ci->random_rate_mcs );
 		}else{
