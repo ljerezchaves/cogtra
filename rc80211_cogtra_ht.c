@@ -388,26 +388,25 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 			max_prob_rate_gix = i;
 			tp_val_total = cg->rates[cg->max_prob_rate_gix].avg_prob;
 			max_prob_rate = cg->max_prob_rate_gix;
-		}	
-		
-		
-		/* Get a new random rate for next interval (using a normal distribution) */
-		random_gix = rc80211_cogtra_ht_normal_generator ((int)cg->max_tp_rate_gix,
-				(int)cg->cur_stdev);
-		cg->random_rate_gix = (unsigned int)(max (0, min (random_gix,
-						(int)((int)(MCS_GROUP_RATES) - 1))));
-		cg->rates[cg->random_rate_gix].times_called++;
-		
+		}
+				
 	}
 	
 		//FIXME
 		ci->max_tp_rate_mcs = (max_tp_rate_gix * MCS_GROUP_RATES) + max_tp_rate;
 		ci->max_prob_rate_mcs = (max_prob_rate_gix * MCS_GROUP_RATES) + max_prob_rate;
 		
+		//Get the Random Group
 		random_rate_gix = rc80211_cogtra_ht_normal_generator((int)ci->max_tp_rate_mcs, (int)150) / 8;
 		random_rate_gix = (unsigned int) ( max( 0 , min( (int)random_rate_gix, (int)((int) ci->n_groups - 1))));
+		/* Get a new random of internal group */
+		random_gix = rc80211_cogtra_ht_normal_generator ((int)ci->groups[random_rate_gix].max_tp_rate_gix, (int) ci->groups[random_rate_gix].cur_stdev);
+		ci->groups[random_rate_gix].random_rate_gix = (unsigned int)(max (0, min (random_gix, (int)((int)(MCS_GROUP_RATES) - 1))));
+		ci->groups[random_rate_gix].rates[cg->random_rate_gix].times_called++;
+		//Get the MCS of random
 		random_rt = ci->groups[random_rate_gix].random_rate_gix;
 		ci->random_rate_mcs = (random_rate_gix * MCS_GROUP_RATES) + random_rt;
+		
 		
 		cogtra_ht_tx_rate_populate (ci);
 
