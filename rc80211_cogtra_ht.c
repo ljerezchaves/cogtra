@@ -253,19 +253,27 @@ static inline int minstrel_get_duration(int index) {
 }*/
 
 
-static void cogtra_ht_set_rate(struct ieee80211_tx_rate *rate, int index){
+static void cogtra_ht_set_rate(struct ieee80211_tx_rate *rate, int index, bool sample, bool rtscts){
     const struct mcs_group *group = &minstrel_mcs_groups[index / MCS_GROUP_RATES];
     //rate->idx = index % MCS_GROUP_RATES + (group->streams - 1) * MCS_GROUP_RATES;
 	rate->idx = index;
 	rate->flags = IEEE80211_TX_RC_MCS | group->flags;
-	rate->count = 2U;
+	if (rtscts)
+		rate->flags |= IEEE80211_TX_RC_USE_RTS_CTS;
+	
+	if (sample){
+		rate->count = 1U;
+	}
+	else{
+		rate->count = 2U;
+	}
 }
 
 static void cogtra_ht_tx_rate_populate(struct cogtra_ht_sta *ci) {
-	cogtra_ht_set_rate(&ci->tx_rates[0], ci->random_rate_mcs);
-	cogtra_ht_set_rate(&ci->tx_rates[1], ci->max_tp_rate_mcs);
-	cogtra_ht_set_rate(&ci->tx_rates[2], ci->max_prob_rate_mcs);
-	cogtra_ht_set_rate(&ci->tx_rates[3], 0);
+	cogtra_ht_set_rate(&ci->tx_rates[0], ci->random_rate_mcs,true,false);
+	cogtra_ht_set_rate(&ci->tx_rates[1], ci->max_tp_rate_mcs,false,true);
+	cogtra_ht_set_rate(&ci->tx_rates[2], ci->max_prob_rate_mcs,false,true);
+	cogtra_ht_set_rate(&ci->tx_rates[3], 0, false,true);
 }
 
 static inline struct minstrel_rate_stats * minstrel_get_ratestats(struct cogtra_ht_sta *ci, int index){
@@ -535,15 +543,8 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta, struc
 
 	
 	/* Check the need of an update_stats based on update_interval */
-	//printk("Update Counter: %lu\n Update Interval: %u\n",ci->update_counter,ci->update_interval);
 	if (ci->update_counter >= ci->update_interval)
-		//cogtra_ht_update_stats (cp, ci);
-	
-	
-	/* Setting up tx rate information.
-	 * Be careful to convert ndx indexes into ieee80211_tx_rate indexes */
-
-	
+		cogtra_ht_update_stats (cp, ci);
 	
 	if (!mrr) {
 		ar[0] = ci->tx_rates[0];
@@ -551,11 +552,6 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta, struc
 		ar[1].count = 0;
 		return;
 	}
-	
-	cogtra_ht_set_rate(&ci->tx_rates[0], 7);
-	cogtra_ht_set_rate(&ci->tx_rates[1], 7);
-	cogtra_ht_set_rate(&ci->tx_rates[2], 7);
-	cogtra_ht_set_rate(&ci->tx_rates[3], 0);
 	
 	/* MRR setup */
 	for (i = 0; i < 4; i++) {
