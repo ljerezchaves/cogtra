@@ -348,7 +348,6 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 				/* Update success and attempt counters */
 				cr->succ_hist += cr->success;
 				cr->att_hist += cr->attempts;
-			
 			}
 
 			/* Update success and attempt counters */
@@ -366,8 +365,6 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 				max_prob_gix = j;
 				max_prob_value = cr->avg_prob;
 			}
-			
-			
 			
 		}
 		new_thp = cg->rates[cg->random_rate_gix].avg_tp;
