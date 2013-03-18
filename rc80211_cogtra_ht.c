@@ -262,9 +262,9 @@ static void cogtra_ht_set_rate(struct ieee80211_tx_rate *rate, int index){
 }
 
 static void cogtra_ht_tx_rate_populate(struct cogtra_ht_sta *ci) {
-	cogtra_ht_set_rate(&ci->tx_rates[0], ci->random_rate_mcs);
-	cogtra_ht_set_rate(&ci->tx_rates[1], ci->max_tp_rate_mcs);
-	cogtra_ht_set_rate(&ci->tx_rates[2], ci->max_prob_rate_mcs);
+	cogtra_ht_set_rate(&ci->tx_rates[0], 7);
+	cogtra_ht_set_rate(&ci->tx_rates[1], 7);
+	cogtra_ht_set_rate(&ci->tx_rates[2], 7);
 	cogtra_ht_set_rate(&ci->tx_rates[3], 0);
 }
 
@@ -582,7 +582,7 @@ cogtra_ht_update_caps (void *priv, struct ieee80211_supported_band *sband, struc
 		return mac80211_cogtra.rate_init(priv,sband,sta,&csp->legacy);
 	}
 
-	csp->is_ht = false;
+	csp->is_ht = true;
 	memset(ci,0,sizeof(*ci));
 
 	ack_dur = ieee80211_frame_duration(local, 10, 60, 1, 1);
