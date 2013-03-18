@@ -288,7 +288,6 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 		ci->avg_ampdu_len = ((MINSTREL_FRAC(ci->ampdu_len, ci->ampdu_packets) * (100 - cp->ewma_level)) + (ci->avg_ampdu_len * cp->ewma_level)) / 100;
 		ci->ampdu_len = 0;
 		ci->ampdu_packets = 0;
-		printk("avg%u \n",ci->avg_ampdu_len );
 	}
 
 	/* For each supported rate... */
@@ -387,16 +386,6 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 	max_prob_rate = 0;
 	
 	
-	//Qual dos dois grupos?
-		if(groupFlag == 0){
-			random_rate_gix = 0;
-			random_rt = ci->groups[0].random_rate_gix;
-			groupFlag = 1;
-		}else{
-			random_rate_gix = 1;
-			random_rt = ci->groups[1].random_rate_gix;
-			groupFlag = 0;
-		}
 			
 	/* For each supported group... */
 	for (i = 0; i < ARRAY_SIZE(minstrel_mcs_groups); i++) {
@@ -414,22 +403,27 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 		}	
 	}
 		//FIXME
-		ci->random_rate_mcs = (random_rate_gix * MCS_GROUP_RATES) + random_rt;
 		ci->max_tp_rate_mcs = (max_tp_rate_gix * MCS_GROUP_RATES) + max_tp_rate;
 		ci->max_prob_rate_mcs = (max_prob_rate_gix * MCS_GROUP_RATES) + max_prob_rate;
-		ci->update_counter = 0UL;
-
+		
+		random_rate_gix = rc80211_cogtra_ht_normal_generator((int)ci->max_tp_rate_mcs, (int)150) / 8;
+		random_rate_gix = (unsigned int) ( max( 0 , min( (int)random_rate_gix, (int)((int) ci->n_groups - 1))));
+		random_rt = ci->groups[random_rate_gix].random_rate_gix;
+		ci->random_rate_mcs = (random_rate_gix * MCS_GROUP_RATES) + random_rt;
+		
 		cogtra_ht_tx_rate_populate (ci);
 
 		/* Adjust update_interval dependending on the random rate */
 		/* RANDOM < BEST || RANDOM.PROB < 10% */
-		/*if ((ci->rates[ci->random_rate_ndx].perfect_tx_time >
-					ci->rates[ci->max_tp_rate_mcs].perfect_tx_time) ||
-				(ci->rates[ci->random_rate_ndx].avg_prob < 180)) 
+		cr = minstrel_get_ratestats(ci,ci->random_rate_mcs);
+		if ( minstrel_mcs_groups[random_rate_gix].duration[random_rt] > minstrel_mcs_groups[max_tp_rate_gix].duration[max_tp_rate]) || 
+			(ci->groups[random_rate_gix].rates[random_rt].avg_prob < 180)){
 			ci->update_interval = COGTRA_HT_RECOVERY_INTERVAL;
-		else
+			printk("r:%u | t:%u\n", ci->random_rate_mcs,ci->random_rate_mcs );
+		}else{
 			ci->update_interval = COGTRA_HT_UPDATE_INTERVAL;
-		}*/
+		}
+		ci->update_counter = 0UL;
 }
 
 static int minstrel_ht_get_group_idx(struct ieee80211_tx_rate *rate) {
@@ -482,11 +476,12 @@ static void cogtra_ht_tx_status (void *priv, struct ieee80211_supported_band *sb
 	if (!(info->flags & IEEE80211_TX_STAT_AMPDU)) {
 		info->status.ampdu_ack_len = (info->flags & IEEE80211_TX_STAT_ACK ? 1 : 0);
 		info->status.ampdu_len = 1;
+	}else{
+		printk("not len %u\n ",info->status.ampdu_len );
 	}
 	
 	ci->ampdu_packets++;
 	ci->ampdu_len += info->status.ampdu_len;
-	printk("pack:%u | len:%u \n",ci->ampdu_packets,ci->ampdu_len );
 	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
 	
 		/* A rate idx -1 means that the following rates weren't used in tx */
