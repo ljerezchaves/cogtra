@@ -388,14 +388,14 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 
 		
 		//Compara o melhor dos grupos	
-		if (random_val_total < cg->rates[cg->max_tp_rate_gix].avg_tp) {
+		if (tp_val_total < cg->rates[cg->max_tp_rate_gix].avg_tp) {
 			max_tp_rate_gix = i;
 			tp_val_total = cg->rates[cg->max_tp_rate_gix].avg_tp;
 			max_tp_rate = cg->max_tp_rate_gix;
 		}
-		if (tp_val_total < cg->rates[cg->max_prob_rate_gix].avg_prob) {
+		if (prob_val_total < cg->rates[cg->max_prob_rate_gix].avg_prob) {
 			max_prob_rate_gix = i;
-			tp_val_total = cg->rates[cg->max_prob_rate_gix].avg_prob;
+			prob_val_total = cg->rates[cg->max_prob_rate_gix].avg_prob;
 			max_prob_rate = cg->max_prob_rate_gix;
 		}
 				
