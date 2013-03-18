@@ -356,12 +356,8 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 			cr->last_attempts = cr->attempts;
 			cr->success = 0;
 			cr->attempts = 0;
-		}
-		new_thp = cg->rates[cg->random_rate_gix].avg_tp;
-
-		/* Look for the rate with highest throughput and probability */
-		for (j = 0; j < MCS_GROUP_RATES; j++) {
-			struct minstrel_rate_stats *cr = &cg->rates[j];
+			
+			/* Look for the rate with highest throughput and probability */
 			if (max_tp_value < cr->avg_tp) {
 				max_tp_gix = j;
 				max_tp_value = cr->avg_tp;
@@ -370,7 +366,11 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 				max_prob_gix = j;
 				max_prob_value = cr->avg_prob;
 			}
+			
+			
+			
 		}
+		new_thp = cg->rates[cg->random_rate_gix].avg_tp;
 		
 		cg->max_tp_rate_gix = max_tp_gix;
 		cg->max_prob_rate_gix = max_prob_gix;
@@ -403,8 +403,6 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 		
 	}
 	
-	
-
 		//FIXME
 		ci->max_tp_rate_mcs = (max_tp_rate_gix * MCS_GROUP_RATES) + max_tp_rate;
 		ci->max_prob_rate_mcs = (max_prob_rate_gix * MCS_GROUP_RATES) + max_prob_rate;
