@@ -262,9 +262,9 @@ static void cogtra_ht_set_rate(struct ieee80211_tx_rate *rate, int index){
 }
 
 static void cogtra_ht_tx_rate_populate(struct cogtra_ht_sta *ci) {
-	cogtra_ht_set_rate(&ci->tx_rates[0], 7);
-	cogtra_ht_set_rate(&ci->tx_rates[1], 7);
-	cogtra_ht_set_rate(&ci->tx_rates[2], 7);
+	cogtra_ht_set_rate(&ci->tx_rates[0], ci->random_rate_mcs);
+	cogtra_ht_set_rate(&ci->tx_rates[1], ci->max_tp_rate_mcs);
+	cogtra_ht_set_rate(&ci->tx_rates[2], ci->max_prob_rate_mcs);
 	cogtra_ht_set_rate(&ci->tx_rates[3], 0);
 }
 
@@ -537,20 +537,26 @@ cogtra_ht_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta, struc
 	/* Check the need of an update_stats based on update_interval */
 	//printk("Update Counter: %lu\n Update Interval: %u\n",ci->update_counter,ci->update_interval);
 	if (ci->update_counter >= ci->update_interval)
-		cogtra_ht_update_stats (cp, ci);
+		//cogtra_ht_update_stats (cp, ci);
 	
 	
 	/* Setting up tx rate information.
 	 * Be careful to convert ndx indexes into ieee80211_tx_rate indexes */
 
-		
+	
+	
 	if (!mrr) {
 		ar[0] = ci->tx_rates[0];
 		ar[1].idx = -1;
 		ar[1].count = 0;
 		return;
 	}
-
+	
+	cogtra_ht_set_rate(&ci->tx_rates[0], 7);
+	cogtra_ht_set_rate(&ci->tx_rates[1], 7);
+	cogtra_ht_set_rate(&ci->tx_rates[2], 7);
+	cogtra_ht_set_rate(&ci->tx_rates[3], 0);
+	
 	/* MRR setup */
 	for (i = 0; i < 4; i++) {
 		ar[i] = ci->tx_rates[i];
