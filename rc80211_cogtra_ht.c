@@ -279,7 +279,7 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 	unsigned int random_rate_gix, random_rt, random_val_total;
 	unsigned int max_tp_rate_gix, max_tp_rate, tp_val_total;
 	unsigned int max_prob_rate_gix, max_prob_rate, prob_val_total;
-	
+	int random_gix = 0;
 	int i,j;
 	
 	ci->up_stats_counter++;
@@ -290,6 +290,7 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 		ci->ampdu_packets = 0;
 	}
 
+	
 	random_rt = 0;
 	max_tp_rate = 0;
 	max_prob_rate = 0;
@@ -302,7 +303,7 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 		unsigned int old_stdev, old_mean;
 		u32 old_thp, new_thp;
 		
-		int random_gix = 0;
+		
 		u32 usecs;
 		
 		unsigned int max_tp_gix = 0, max_prob_gix = 0;
@@ -419,6 +420,7 @@ static void cogtra_ht_update_stats (struct cogtra_priv *cp, struct cogtra_ht_sta
 		}else{
 			ci->update_interval = COGTRA_HT_UPDATE_INTERVAL;
 		}
+		
 		ci->update_counter = 0UL;
 }
 
