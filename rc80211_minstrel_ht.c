@@ -179,8 +179,7 @@ minstrel_ht_calc_tp(struct minstrel_priv *mp, struct minstrel_ht_sta *mi,
 }
 
 static void
-minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)exit
-
+minstrel_ht_update_rates(struct minstrel_priv *mp, struct minstrel_ht_sta *mi)
 {
 	minstrel_ht_set_rate(mp, mi, &mi->tx_rates[0], mi->max_tp_rate,
 			     false, false);
