@@ -330,6 +330,24 @@ minstrel_get_rate(void *priv, struct ieee80211_sta *sta,
 		ar[i].idx = mi->r[mrr_ndx[i - 1]].rix;
 		ar[i].count = mi->r[mrr_ndx[i - 1]].adjusted_retry_count;
 	}
+
+#ifdef CONFIG_MAC80211_DEBUGFS
+	if (mi->dbg_idx < MINSTREL_DEBUGFS_HIST_SIZE) {
+        struct minstrel_hist_info *ht = &mi->hi[mi->dbg_idx];
+        struct minstrel_hist_info *hl = &mi->hi[mi->dbg_idx-1];
+        int r0 = mi->r[rix_to_ndx(mi, ar[0].idx)].bitrate;
+
+        if (hl->rate0 != r0) {
+            unsigned long diff = (long)jiffies - (long)mi->first_time;
+		    ht->start_ms = (int)(diff * 1000 / HZ);
+		    ht->rate0 = r0;
+		    ht->rate1 = mi->r[rix_to_ndx(mi, ar[1].idx)].bitrate;
+		    ht->sample = sample ? (sample_slower ? -1 : 1) : 0;
+            mi->dbg_idx++;
+        }
+	}
+#endif
+
 }
 
 
@@ -472,9 +490,19 @@ minstrel_alloc_sta(void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 	if (!mi->sample_table)
 		goto error1;
 
+#ifdef CONFIG_MAC80211_DEBUGFS
+   	mi->hi = kzalloc (sizeof (struct minstrel_hist_info) * MINSTREL_DEBUGFS_HIST_SIZE, gfp);
+	if (!mi->hi)
+		goto error2;
+#endif
+
 	mi->stats_update = jiffies;
+	mi->first_time = jiffies;
+    mi->dbg_idx = 1;
 	return mi;
 
+error2:
+	kfree(mi->sample_table);
 error1:
 	kfree(mi->r);
 error:
@@ -489,6 +517,9 @@ minstrel_free_sta(void *priv, struct ieee80211_sta *sta, void *priv_sta)
 
 	kfree(mi->sample_table);
 	kfree(mi->r);
+#ifdef CONFIG_MAC80211_DEBUGFS
+	kfree(mi->hi);
+#endif
 	kfree(mi);
 }
 

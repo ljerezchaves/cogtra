@@ -51,13 +51,13 @@
 #include "rate.h"
 #include "rc80211_cogtra.h"
 
-/* COGTRA Automatic Agressivness Adjustment (AAA) */
+/* COGTRA Agressivness Self-Adjustment (ASA) */
 static inline int
-cogtra_aaa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp, 
+cogtra_asa (unsigned int last_mean, unsigned int curr_mean, u32 last_thp, 
 		u32 curr_thp, unsigned int stdev)
 {
-	/* Check for more than 10% thp variation */
-	s32 delta = (s32)(last_thp / 10);
+	/* Check for more than ASA_DELTA thp variation */
+	s32 delta = (s32)(last_thp / COGTRA_ASA_DELTA);
 	s32 diff = (s32)(curr_thp - last_thp);
 
 	if (abs (diff) > delta)
@@ -98,6 +98,9 @@ rc80211_cogtra_normal_generator (int mean, int stdev_times100)
 	 * rounding. The following values were obtained from simulations. I'm still
 	 * not sure about this, but is working well... */
 	switch (stdev_times100) {
+	case 20:
+		round_fac = 40;
+		break;
 	case 25:
 		round_fac = 45;
 		break;
@@ -251,7 +254,8 @@ cogtra_mrr_populate (struct cogtra_sta_info *ci)
  * expires. It sumarizes statistics information and use cogtra core algorithm to
  * select the rate to be used during next interval. */
 static void
-cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
+cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci, 
+		struct ieee80211_sta *sta)
 {
 	u32 usecs;
 	u32 max_tp = 0, max_prob = 0;
@@ -259,6 +263,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 	unsigned int old_stdev, old_mean;
 	u32 old_thp, new_thp;
 	int random = 0;
+	unsigned long j, diff = 0;
 
 	ci->up_stats_counter++;
 
@@ -297,10 +302,8 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 		/* Update success and attempt counters */
 		cr->last_success = cr->success;
 		cr->last_attempts = cr->attempts;
-
 		cr->success = 0;
 		cr->attempts = 0;
-		
 	}
 
 	new_thp = ci->r[ci->random_rate_ndx].avg_tp;
@@ -321,9 +324,36 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 	ci->max_prob_rate_ndx = max_prob_ndx;
 	ci->update_counter = 0UL;
 
+#ifdef CONFIG_MAC80211_DEBUGFS
+	/* History table information (remaining) for the past cycle: duration, avgsignal and MRR usage */
+	if (ci->dbg_idx < COGTRA_DEBUGFS_HIST_SIZE) {
+		// struct chain_table *ct = ci->t;
+		struct cogtra_hist_info *ht = &ci->hi[ci->dbg_idx];
+		struct sta_info *si = container_of (sta, struct sta_info, sta);
+		struct ewma *avg = &si->avg_signal;
+
+		j = jiffies;
+		diff = (long)j - (long)ci->last_time;
+		ht->duration_ms = (int)(diff * 1000 / HZ);
+		ci->last_time = j;
+	
+		ht->avg_signal = (int)ewma_read (avg);
+		
+		// FIXME: parece nao estar funcionando... deixei de lado por enquanto
+		// ht->rand_pct = (int)((100*ct[0].suc) / ci->update_interval); 
+		// ht->best_pct = (int)((100*ct[1].suc) / ci->update_interval); 
+		// ht->prob_pct = (int)((100*ct[2].suc) / ci->update_interval); 
+		// ht->lowr_pct = (int)((100*ct[3].suc) / ci->update_interval); 
+		
+		ci->dbg_idx++;
+	}
+#endif
+
+#ifdef COGTRA_USE_ASA
 	/* Adjusting stdev with CogTRA AAA */
-	ci->cur_stdev = cogtra_aaa (old_mean, ci->max_tp_rate_ndx,
+	ci->cur_stdev = cogtra_asa (old_mean, ci->max_tp_rate_ndx,
 			old_thp, new_thp, old_stdev);
+#endif
 
 	/* Get a new random rate for next interval (using a normal distribution) */
 	random = rc80211_cogtra_normal_generator ((int)ci->max_tp_rate_ndx,
@@ -334,7 +364,7 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 
 	cogtra_mrr_populate (ci);
 
-		
+#ifdef COGTRA_USE_ISA
 	/* Adjust update_interval dependending on the random rate */
 	/* RANDOM < BEST || RANDOM.PROB < 10% */
 	if ((ci->r[ci->random_rate_ndx].perfect_tx_time >
@@ -343,6 +373,23 @@ cogtra_update_stats (struct cogtra_priv *cp, struct cogtra_sta_info *ci)
 		ci->update_interval = COGTRA_RECOVERY_INTERVAL;
 	else
 		ci->update_interval = COGTRA_UPDATE_INTERVAL;
+#endif
+
+#ifdef CONFIG_MAC80211_DEBUGFS
+	/* History table information for the next cycle*/
+	if (ci->dbg_idx < COGTRA_DEBUGFS_HIST_SIZE) {
+		struct cogtra_hist_info *ht = &ci->hi[ci->dbg_idx];
+
+		diff = (long)j - (long)ci->first_time;
+		ht->start_ms = (int)(diff * 1000 / HZ);
+			
+		ht->rand_rate = ci->r[ci->random_rate_ndx].bitrate;
+		ht->best_rate = ci->r[ci->max_tp_rate_ndx].bitrate;
+		ht->prob_rate = ci->r[ci->max_tp_rate_ndx].bitrate;
+		ht->cur_stdev = ci->cur_stdev;
+		ht->pkt_interval = ci->update_interval;
+	}
+#endif
 }
 
 
@@ -381,7 +428,8 @@ cogtra_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	
 		/* If it is the last used rate and resultesd in tx success, also
 		 * increse the success counter */
-		if ((i != IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) {
+		if (((i != IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) ||
+				(i == IEEE80211_TX_MAX_RATES - 1)) {
 			ci->r[ndx].success += success;
 			ct[i].suc += success;
 		}
@@ -413,24 +461,28 @@ cogtra_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 
 	/* Check the need of an update_stats based on update_interval */
 	if (ci->update_counter >= ci->update_interval)
-		cogtra_update_stats (cp, ci);
+		cogtra_update_stats (cp, ci, sta);
 
 	/* Setting up tx rate information. 
 	 * Be careful to convert ndx indexes into ieee80211_tx_rate indexes */
-	
-	if (!mrr) {
-		ar[0].idx = ci->r[ci->random_rate_ndx].rix;
-		ar[0].count = cp->max_retry;
-		ar[1].idx = -1;
-		ar[1].count = 0;
-		return;
-	}
 
-	/* MRR setup */
-	for (i = 0; i < 4; i++) {
-		ar[i].idx = ci->t[i].rix;
-		ar[i].count = ci->t[i].count;
+#ifdef COGTRA_USE_MRR
+	if (mrr) {
+		/* MRR setup */
+		for (i = 0; i < 4; i++) {
+			ar[i].idx = ci->t[i].rix;
+			ar[i].count = ci->t[i].count;
+		}
+		return;	
 	}
+#endif
+
+	/* Executed when no MRR support or COGTRA_USE_MRR disable */	
+	ar[0].idx = ci->r[ci->random_rate_ndx].rix;
+	ar[0].count = cp->max_retry;
+	ar[1].idx = -1;
+	ar[1].count = 0;
+	return;
 }
 
 
@@ -489,9 +541,20 @@ cogtra_rate_init (void *priv, struct ieee80211_supported_band *sband,
 	for (i = n; i < sband->n_bitrates; i++)
 		ci->r[i].rix = -1;
 
+#ifdef CONFIG_MAC80211_DEBUGFS
+	/* Filling information for this first rate adaptation */
+	ci->hi[0].start_ms = 0;
+	ci->hi[0].rand_rate = ci->hi[0].best_rate = ci->hi[0].prob_rate = ci->r[0].bitrate;
+	ci->hi[0].cur_stdev = COGTRA_MAX_STDEV;
+	ci->hi[0].pkt_interval = COGTRA_UPDATE_INTERVAL;
+	ci->dbg_idx = 0;
+#endif
+
+	ci->update_interval = COGTRA_UPDATE_INTERVAL;	
 	ci->cur_stdev = COGTRA_MAX_STDEV;
 	ci->n_rates = n;
 	ci->update_counter = 0UL;
+	ci->first_time = ci->last_time = jiffies;
 }
 
 
@@ -532,8 +595,16 @@ cogtra_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 		return NULL;
 	}
 
-	ci->update_interval = COGTRA_UPDATE_INTERVAL;
-	ci->update_counter = 0UL;
+#ifdef CONFIG_MAC80211_DEBUGFS
+	/* If in debugfs mode, memory allocation for history table */
+   	ci->hi = kzalloc (sizeof (struct cogtra_hist_info) * COGTRA_DEBUGFS_HIST_SIZE, gfp);
+	if (!ci->hi) {
+		kfree (ci->t);
+		kfree (ci->r);
+		kfree (ci);
+		return NULL;
+	}
+#endif
 
 	return ci;
 }
@@ -547,6 +618,9 @@ cogtra_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 
 	kfree (ci->t);
 	kfree (ci->r);
+#ifdef CONFIG_MAC80211_DEBUGFS
+	kfree (ci->hi);
+#endif
 	kfree (ci);
 }
 

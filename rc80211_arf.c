@@ -81,38 +81,92 @@ sort_bitrates (struct arf_sta_info *ci, int n_rates)
 	}
 }
 
-
-static void arf_success (struct arf_sta_info *ci)
+static void arf_sync (struct arf_sta_info *ci, int rate_ndx)
 {
+	printk ("ARF: Sync... from %d to %d\n", ci->current_rate_ndx, rate_ndx);
+    // ci->current_rate_ndx = (unsigned int)rate_ndx;
+}
+
+static void arf_log (struct arf_sta_info *ci, int event, int rate, int last)
+{
+	unsigned long diff; 
+	
+	if (ci->dbg_idx < ARF_DEBUGFS_HIST_SIZE) {
+		struct arf_hist_info *ht = &ci->hi[ci->dbg_idx];
+		
+		diff = (long)jiffies - (long)ci->first_time;
+		ht->start_ms = (int)(diff * 1000 / HZ);	
+		ht->rate = ci->r[rate].bitrate;
+		ht->last = ci->r[last].bitrate;
+		ht->event = event;
+		ht->timer = ci->timer;
+		ht->success = ci->success;
+		ht->failures = ci->failures;
+		ht->recovery = ci->recovery;
+		ht->success_thrs = ci->success_thrs;
+		ht->timeout = ci->timeout;
+		ci->dbg_idx++;	
+	}
+}
+
+static void arf_att_success (struct arf_sta_info *ci, int rate)
+{
+	if (rate != ci->current_rate_ndx) 
+        arf_sync (ci, rate);
+
 	ci->timer++;
 	ci->success++;
 	ci->failures = 0;
 	ci->recovery = false;
-	if (((ci->success >= ci->success_thrs) || (ci->timer >= ci->timeout)) &&
-			(ci->current_rate_ndx < (ci->n_rates - 1)))
+
+	if (ci->current_rate_ndx < (ci->n_rates - 1))
 	{
-		ci->current_rate_ndx++;
-		ci->timer = 0;
-		ci->success = 0;
-		ci->recovery = true;
+        if (ci->success >= ci->success_thrs) {
+    		arf_log (ci, ARF_LOG_SUCCESS, ci->current_rate_ndx+1, ci->current_rate_ndx);
+		    ci->current_rate_ndx++;
+		    ci->timer = 0;
+		    ci->success = 0;
+		    ci->recovery = true;
+        } else if (ci->timer >= ci->timeout) {
+    		arf_log (ci, ARF_LOG_TIMEOUT, ci->current_rate_ndx+1, ci->current_rate_ndx);
+		    ci->current_rate_ndx++;
+		    ci->timer = 0;
+		    ci->success = 0;
+		    ci->recovery = true;
+       }
 	}
 }
 
 
-static void arf_failure (struct arf_sta_info *ci)
+static void arf_att_failure (struct arf_sta_info *ci, int rate)
 {
+	if (rate != ci->current_rate_ndx) 
+        arf_sync (ci, rate);
+
 	ci->timer++;
 	ci->failures++;
 	ci->success = 0;
-	if (((ci->recovery == true) || (ci->failures >= 2)) &&
-            (ci->current_rate_ndx != 0))
+	if (ci->recovery == true)
 	{
-		ci->current_rate_ndx--;
+		arf_log (ci, ARF_LOG_RECOVER, ci->current_rate_ndx-1 < 0 ? 0 : ci->current_rate_ndx-1, ci->current_rate_ndx);
 		ci->timer = 0;
 		ci->failures = 0;
+		ci->timeout = max (ci->timeout * ci->timeout_k, ci->min_succ_thrs);
+		ci->success_thrs = min (ci->success_thrs * ci->success_k,
+				ci->max_succ_thrs);
+		if (ci->current_rate_ndx > 0)
+			ci->current_rate_ndx--;
+	}
+	else if (ci->failures >= 2 && ci->current_rate_ndx > 0)
+	{
+		arf_log (ci, ARF_LOG_FAILURE, ci->current_rate_ndx-1 < 0 ? 0 : ci->current_rate_ndx-1, ci->current_rate_ndx);
+		ci->timer = 0;
+		ci->failures = 0;
+		ci->timeout = ci->min_timeout;
+		ci->success_thrs = ci->min_succ_thrs;
+		ci->current_rate_ndx--;
 	}
 }
-
 
 /* arf_tx_status is called just after frame tx and it is used to update
  * statistics information for the used rate */
@@ -123,18 +177,66 @@ arf_tx_status (void *priv, struct ieee80211_supported_band *sband,
 	struct arf_sta_info *ci = priv_sta;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct ieee80211_tx_rate *ar = info->status.rates;
-	int i = 0;
+	int i = 0, j = 0;
    	int success = 0;
- 
-	if (ar[i].idx < 0)
-		return;
+	int ndx;
 
-	/* Checking for a success in frame transmission */
-	success = !!(info->flags & IEEE80211_TX_STAT_ACK);
-	if (success)
-		arf_success (ci);
-	else 
-		arf_failure (ci);
+	/* Checking for a success in packet transmission */
+    success = !!(info->flags & IEEE80211_TX_STAT_ACK);
+
+	/* The logic is: I need to figure out if how much attemps were performed,
+	 * and call the respective funcions in the correct order... There are 3
+	 * possibilities: 
+	 *	1) The tx succeed at fisrt attempt 
+	 *	2) The tx succeed after some failed attempt
+	 *	3) The tx failed after all attempts	
+	 */
+
+	/* The tx succeed... */
+	if (success) {
+
+		/* ... at first attempt. */
+		if (ar[0].count == 1 && ar[1].idx < 0) {
+	   	   	ndx = rix_to_ndx (ci, ar[i].idx);
+			arf_att_success (ci, ndx);
+			return;
+		}
+
+		/* ... after some failed attempts */
+		for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
+	   		if (ar[i].idx < 0) break;	// Not used
+	   	   	ndx = rix_to_ndx (ci, ar[i].idx);
+	   	    if (ndx < 0) continue;		// Invalid
+	   					
+	   	    /* Check if this is the last used rate */
+	   	    if (((i < IEEE80211_TX_MAX_RATES - 1) && (ar[i + 1].idx < 0)) ||
+	   				(i == IEEE80211_TX_MAX_RATES - 1)) {
+
+				/* There are possible failed attemps on this rate, but
+				 * definetelly the last attemp was an success. */
+				for (j = 0; j < ar[i].count - 1; j++)
+					arf_att_failure (ci, ndx);
+				arf_att_success (ci, ndx);	
+	   		
+			/* This is not the last rate. Compute failed attempts. */
+			} else {
+				for (j = 0; j < ar[i].count; j++)
+					arf_att_failure (ci, ndx);
+	   		}
+	   	}
+	
+	/* The tx failed after all attempts. */
+	} else {
+   		for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
+   			if (ar[i].idx < 0) break;	// Not used
+	   	   	ndx = rix_to_ndx (ci, ar[i].idx);
+	   	    if (ndx < 0) continue;		// Invalid
+	   			
+			/* Compute failed attempts */			
+			for (j = 0; j < ar[i].count; j++)
+				arf_att_failure (ci, ndx);
+   		}
+	}
 }
 
 
@@ -147,19 +249,36 @@ arf_get_rate (void *priv, struct ieee80211_sta *sta, void *priv_sta,
 	struct sk_buff *skb = txrc->skb;
 	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct arf_sta_info *ci = priv_sta;
-	struct arf_priv *cp = priv;
 	struct ieee80211_tx_rate *ar = info->control.rates;
+	int i;
+	unsigned int rate_ndx;
 
 	/* Check for management or control packet, which should be transmitted
 	 * unsing lower rate */
 	if (rate_control_send_low (sta, priv_sta, txrc))
 		return;
 
-	/* Setting up tx rate information. */
-	ar[0].idx = ci->r[ci->current_rate_ndx].rix;
-	ar[0].count = cp->max_retry;
-	ar[1].idx = -1;
-	ar[1].count = 0;
+	/* Here's the ARF algorithm implemented thanks to MRR capability. At this
+	 * point we are ready for pkt tx attempt. Our only concern here is about
+	 * failedd tx attemps, for which wee need to previous setup the MRR chain
+	 * table in accordance. First we are considering that the last tx succedd
+	 */
+	rate_ndx = ci->current_rate_ndx;
+	for (i = 0; i < IEEE80211_TX_MAX_RATES; i++) {
+		ar[i].idx = ci->r[rate_ndx].rix;
+		ar[i].count = 2;
+		rate_ndx = rate_ndx > 0 ? rate_ndx - 1 : 0;
+	}
+
+	/* Now let's check if we are in recovery mode (the first attemp on current
+	 * rate) or if the last attemp on this rate failed. In these cases we can
+	 * try only once on the first rate. */
+	if ((ci->recovery == true) || (ci->failures >= 1))
+		ar[0].count = 1;
+
+	/* NOTE: This code above only works because ARF always reduce the rate
+	 * after 1 or 2 attemps on the same rate. If you want to change this number
+	 * this code will demand adjustments. */
 }
 
 
@@ -194,8 +313,10 @@ arf_rate_init (void *priv, struct ieee80211_supported_band *sband,
 		struct arf_rate *cr = &ci->r[i];
 		cr->rix = -1;
 	}
-	
+
+	ci->dbg_idx = 0;	
 	ci->n_rates = n;
+	ci->first_time = jiffies;
 }
 
 
@@ -228,13 +349,28 @@ arf_alloc_sta (void *priv, struct ieee80211_sta *sta, gfp_t gfp)
 		return NULL;
 	}
 
+#ifdef CONFIG_MAC80211_DEBUGFS
+	/* If in debugfs mode, memory allocation for history table */
+   	ci->hi = kzalloc (sizeof (struct arf_hist_info) * ARF_DEBUGFS_HIST_SIZE, gfp);
+	if (!ci->hi) {
+		kfree (ci->r);
+		kfree (ci);
+		return NULL;
+	}
+#endif
+
 	ci->current_rate_ndx = 0;
 	ci->success = 0;
 	ci->failures = 0;
 	ci->timer = 0;
 	ci->recovery = false;
-	ci->success_thrs = ARF_SUCC_THRS;
-	ci->timeout = ARF_TIMEOUT;
+	ci->success_thrs = ARF_MIN_SUCC_THRS;
+	ci->timeout = ARF_MIN_TIMEOUT;
+	ci->min_timeout = ARF_MIN_TIMEOUT;
+	ci->min_succ_thrs = ARF_MIN_SUCC_THRS;
+	ci->max_succ_thrs = ARF_MAX_SUCC_THRS;
+	ci->success_k = ARF_SUCCESS_K;
+	ci->timeout_k = ARF_TIMER_K;
 
 	return ci;
 }
@@ -246,6 +382,9 @@ arf_free_sta (void *priv, struct ieee80211_sta *sta, void *priv_sta)
 {
 	struct arf_sta_info *ci = priv_sta;
 
+#ifdef CONFIG_MAC80211_DEBUGFS
+	kfree (ci->hi);
+#endif
 	kfree (ci->r);
 	kfree (ci);
 }
@@ -260,7 +399,7 @@ arf_alloc (struct ieee80211_hw *hw, struct dentry *debugfsdir)
 	cp = kzalloc (sizeof (struct arf_priv), GFP_ATOMIC);
 	if (!cp)
 		return NULL;
-	
+
 	/* Max number of retries */
 	if (hw->max_rate_tries > 0)
 		cp->max_retry = hw->max_rate_tries;

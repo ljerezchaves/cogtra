@@ -57,6 +57,7 @@
 #include <net/mac80211.h>
 #include "rc80211_cogtra.h"
 
+/* Information for rc_stats file */
 int
 cogtra_stats_open (struct inode *inode, struct file *file)
 {
@@ -145,6 +146,64 @@ cogtra_stats_open (struct inode *inode, struct file *file)
 	cs->len = p - cs->buf;
 	return 0;
 }
+	
+/* Information for rc_history file */
+int
+cogtra_hist_open (struct inode *inode, struct file *file)
+{
+	struct cogtra_sta_info *ci = inode->i_private;
+	struct cogtra_debugfs_info *ch;
+	unsigned int i;
+	char *p;
+	// int rest;
+
+	ch = kmalloc (sizeof (*ch) 
+			    + sizeof (struct cogtra_hist_info) * COGTRA_DEBUGFS_HIST_SIZE 
+				+ 1024, GFP_KERNEL);
+	if (!ch)
+		return -ENOMEM;
+
+	file->private_data = ch;
+	p = ch->buf;
+
+	/* Table header */
+	p += sprintf (p, "Cognitive Transmission Rate Adaptation (CogTRA)\n");
+	p += sprintf (p, "History Information Table\n"); 
+	p += sprintf (p, "Rate adaptations: %u (max of %u)\n\n", ci->dbg_idx, COGTRA_DEBUGFS_HIST_SIZE);
+	p += sprintf (p, "Idx | Start time | Duration | AvgSig | Random | BestThp | BestPro | Stdev | Pktint | MRR usage\n");
+
+	/* Table lines */
+	for (i = 0; i < ci->dbg_idx && i < COGTRA_DEBUGFS_HIST_SIZE; i++) {
+		struct cogtra_hist_info	*t = &ci->hi[i];
+		// rest = 100 - t->rand_pct - t->best_pct - t->prob_pct - t->lowr_pct;
+
+		p += sprintf (p, "%3u | %10d | %8d | %6d | %4u%s | %5u%s | %5u%s | %2u.%2u | %6u | %3d,%3d,%3d,%3d,%3d\n", 
+				i,
+				t->start_ms,
+				t->duration_ms,
+				t->avg_signal,
+				t->rand_rate / 2, (t->rand_rate & 1 ? ".5" : "  "),
+				t->best_rate / 2, (t->best_rate & 1 ? ".5" : "  "),
+				t->prob_rate / 2, (t->prob_rate & 1 ? ".5" : "  "),
+				t->cur_stdev / 100, t->cur_stdev % 100,
+				t->pkt_interval,
+				
+				// Nao estava funcionando direito entao deixei de lado...
+				0, 0, 0, 0, 0
+				// t->rand_pct > 100 ? 100 : t->rand_pct, 
+				// t->best_pct > 100 ? 100 : t->best_pct, 
+				// t->prob_pct > 100 ? 100 : t->prob_pct, 
+				// t->lowr_pct > 100 ? 100 : t->lowr_pct, 
+				// rest < 0 ? 0 : rest
+			);
+	}
+
+	if (i == COGTRA_DEBUGFS_HIST_SIZE)
+		p += sprintf (p, "\n   *** Table Full... ***\n");
+
+	ch->len = p - ch->buf;
+	return 0;
+}
 
 ssize_t
 cogtra_stats_read (struct file *file, char __user *buf, size_t len, loff_t *ppos)
@@ -155,8 +214,24 @@ cogtra_stats_read (struct file *file, char __user *buf, size_t len, loff_t *ppos
 	return simple_read_from_buffer (buf, len, ppos, cs->buf, cs->len);
 }
 
+ssize_t
+cogtra_hist_read (struct file *file, char __user *buf, size_t len, loff_t *ppos)
+{
+	struct cogtra_debugfs_info *ch;
+
+	ch = file->private_data;
+	return simple_read_from_buffer (buf, len, ppos, ch->buf, ch->len);
+}
+
 int
 cogtra_stats_release (struct inode *inode, struct file *file)
+{
+	kfree (file->private_data);
+	return 0;
+}
+
+int
+cogtra_hist_release (struct inode *inode, struct file *file)
 {
 	kfree (file->private_data);
 	return 0;
@@ -169,6 +244,13 @@ static const struct file_operations cogtra_stat_fops = {
 	.release = cogtra_stats_release,
 };
 
+static const struct file_operations cogtra_hist_fops = {
+	.owner = THIS_MODULE,
+	.open = cogtra_hist_open,
+	.read = cogtra_hist_read,
+	.release = cogtra_hist_release,
+};
+
 void
 cogtra_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir)
 {
@@ -176,6 +258,8 @@ cogtra_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir)
 
 	ci->dbg_stats = debugfs_create_file ("rc_stats", S_IRUGO, dir,
 			ci, &cogtra_stat_fops); 
+	ci->dbg_hist = debugfs_create_file ("rc_history", S_IRUGO, dir,
+			ci, &cogtra_hist_fops);
 }
 
 void
@@ -184,4 +268,5 @@ cogtra_remove_sta_debugfs(void *priv, void *priv_sta)
 	struct cogtra_sta_info *ci = priv_sta;
 	
 	debugfs_remove (ci->dbg_stats);
+	debugfs_remove (ci->dbg_hist);
 }

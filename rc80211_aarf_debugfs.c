@@ -109,8 +109,69 @@ aarf_stats_open (struct inode *inode, struct file *file)
 	return 0;
 }
 
+/* Information for rc_history file */
+int
+aarf_hist_open (struct inode *inode, struct file *file)
+{
+	struct aarf_sta_info *ci = inode->i_private;
+	struct aarf_debugfs_info *ch;
+	unsigned int i;
+	char *p;
+
+	ch = kmalloc (sizeof (*ch) 
+			    + sizeof (struct aarf_hist_info) * AARF_DEBUGFS_HIST_SIZE 
+				+ 1024, GFP_KERNEL);
+	if (!ch)
+		return -ENOMEM;
+
+	file->private_data = ch;
+	p = ch->buf;
+
+	/* Table header */
+	p += sprintf (p, "Adaptive Auto Rate Fallback (AARF)\n");
+	p += sprintf (p, "History Information Table\n"); 
+	p += sprintf (p, "Rate adaptations: %u (max of %u)\n\n", ci->dbg_idx, AARF_DEBUGFS_HIST_SIZE);
+	p += sprintf (p, "Idx | Start time |  Event  | Rate -> Rate | Timer | Succ | Fail | Recover | succ_ths | timeout \n");
+
+	/* Table lines */
+	for (i = 0; i < ci->dbg_idx && i < AARF_DEBUGFS_HIST_SIZE; i++) {
+		struct aarf_hist_info	*t = &ci->hi[i];
+
+		p += sprintf (p, "%3u | %10d | %s | %2u%s%s%2u%s | %5d | %4d | %4d | %s | %8d | %7d \n", 
+				i,
+				t->start_ms,
+				(t->event == AARF_LOG_SUCCESS ? "Success" : (t->event == AARF_LOG_FAILURE ? "Failure": (t->event == AARF_LOG_RECOVER ? "Recover" : "Timeout"))),				
+				t->last / 2, (t->last & 1 ? ".5" : "  "), " -> ",
+				t->rate / 2, (t->rate & 1 ? ".5" : "  "),
+				t->timer,
+				t->success,
+				t->failures,
+				((t->recovery) ? "  true " : " false "),
+				t->success_thrs,
+				t->timeout				
+			);
+	}
+
+	if (i == AARF_DEBUGFS_HIST_SIZE)
+		p += sprintf (p, "\n   *** Table Full... ***\n");
+
+	ch->len = p - ch->buf;
+	return 0;
+}
+
+
+
 ssize_t
 aarf_stats_read (struct file *file, char __user *buf, size_t len, loff_t *ppos)
+{
+	struct aarf_debugfs_info *cs;
+
+	cs = file->private_data;
+	return simple_read_from_buffer (buf, len, ppos, cs->buf, cs->len);
+}
+
+ssize_t
+aarf_hist_read (struct file *file, char __user *buf, size_t len, loff_t *ppos)
 {
 	struct aarf_debugfs_info *cs;
 
@@ -125,11 +186,25 @@ aarf_stats_release (struct inode *inode, struct file *file)
 	return 0;
 }
 
+int
+aarf_hist_release (struct inode *inode, struct file *file)
+{
+	kfree (file->private_data);
+	return 0;
+}
+
 static const struct file_operations aarf_stat_fops = {
 	.owner = THIS_MODULE,
 	.open = aarf_stats_open,
 	.read = aarf_stats_read,
 	.release = aarf_stats_release,
+};
+
+static const struct file_operations aarf_hist_fops = {
+	.owner = THIS_MODULE,
+	.open = aarf_hist_open,
+	.read = aarf_hist_read,
+	.release = aarf_hist_release,
 };
 
 void
@@ -139,6 +214,8 @@ aarf_add_sta_debugfs (void *priv, void *priv_sta, struct dentry *dir)
 
 	ci->dbg_stats = debugfs_create_file ("rc_stats", S_IRUGO, dir,
 			ci, &aarf_stat_fops); 
+	ci->dbg_hist = debugfs_create_file ("rc_history", S_IRUGO, dir,
+			ci, &aarf_hist_fops); 
 }
 
 void
@@ -147,4 +224,5 @@ aarf_remove_sta_debugfs(void *priv, void *priv_sta)
 	struct aarf_sta_info *ci = priv_sta;
 	
 	debugfs_remove (ci->dbg_stats);
+	debugfs_remove (ci->dbg_hist);
 }

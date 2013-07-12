@@ -14,11 +14,30 @@
 #define __RC_COGTRA_H
 
 /* Cogtra custom code optimization */
-#define COGTRA_MAX_STDEV			150
 #define COGTRA_MIN_STDEV			40
 #define COGTRA_EWMA_LEVEL			30
 #define COGTRA_UPDATE_INTERVAL	    150
 #define COGTRA_RECOVERY_INTERVAL	20
+
+// Use this for fixed stdev (without ASA)
+#define COGTRA_MAX_STDEV 150
+
+/* For experiments considering different delta values for ASA improvement 
+   Use the following table to define the correct constant value
+   Delta 5%  -> CGOTRA_ASA_DELTA 20
+   Delta 10% -> COGTRA_ASA_DELTA 10
+   Delta 20% -> CGOTRA_ASA_DELTA 5
+   Delta 25% -> CGOTRA_ASA_DELTA 4
+   Delta 50% -> CGOTRA_ASA_DELTA 2
+ */
+#define COGTRA_ASA_DELTA			10
+
+/* Use this flags to enable/disable ISA, ASA and MRR improvements */
+#define COGTRA_USE_ASA				
+#define COGTRA_USE_ISA
+#define COGTRA_USE_MRR
+
+#define COGTRA_DEBUGFS_HIST_SIZE	10000U
 
 struct chain_table {
 	unsigned int type;
@@ -64,7 +83,6 @@ struct cogtra_rate {
 };
 
 
-
 /* cogtra_sta_info is allocated once per station. Information in this strcut
  * allows independed rate adaptation for each station */
 struct cogtra_sta_info {
@@ -74,15 +92,20 @@ struct cogtra_sta_info {
 	unsigned int random_rate_ndx;	// random rate index (will be used in the next interval) 
 	unsigned int lowest_rix;		// lowest rate index 
 	unsigned int n_rates;			// number o supported rates 
-	unsigned long update_counter;	// last update time (time based) or pkt counter (pkt based)
-    unsigned int update_interval; 	// time (or pkts) between cogtra_update_stats
+	unsigned long update_counter;	// pkt counter
+    unsigned int update_interval; 	// pkts between cogtra_update_stats
 	unsigned long up_stats_counter;	// update stats counter
+	unsigned long last_time;		// jiffies for the last rate adaptation
+	unsigned long first_time;		// jiffies for the fist rate adaptation
 	
 	struct cogtra_rate *r;			// rate pointer for each station
 	struct chain_table *t;			// chain table pointer for mrr
 
 #ifdef CONFIG_MAC80211_DEBUGFS
-	struct dentry *dbg_stats;		// debug file pointer 
+	struct cogtra_hist_info *hi;	// history table (for the first COGTRA_DEBUGFS_HIST_SIZE rate adaptations)
+	unsigned int dbg_idx;			// history table index
+	struct dentry *dbg_stats;		// debug rc_stats file pointer
+	struct dentry *dbg_hist;		// debug rc_history file pointer
 #endif
 };
 
@@ -107,6 +130,30 @@ struct cogtra_debugfs_info {
 	size_t len;
 	char buf[];
 };
+
+/* Debugfs history table entry */
+struct cogtra_hist_info {
+	int start_ms;					// Time of rate adaptation (milisec)
+	int duration_ms;				// Duration of this cycle (milisec)
+	int avg_signal;					// EWMA signal for this cycle (-dBi)
+	
+	/* Random, best throughput and best probability rates for this cycle */
+	int rand_rate;
+	int best_rate;
+	int prob_rate;
+	
+	/* Cogtra parameters for this cycle: stdev (ASA) and pkt_interval (ISA)	*/ 
+	unsigned int cur_stdev;
+	unsigned int pkt_interval;
+
+	/* % of packages successfuly sent on each rate */
+	int rand_pct;
+	int best_pct;
+	int prob_pct;
+	int lowr_pct;
+	
+};
+
 
 int cogtra_stats_open (struct inode *inode, struct file *file);
 ssize_t cogtra_stats_read (struct file *file, char __user *buf, size_t len, 
