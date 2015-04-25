@@ -12,7 +12,7 @@ PKG_NAME:=mac80211
 
 PKG_VERSION:=2012-03-01
 PKG_RELEASE:=1
-PKG_SOURCE_URL:=http://cogtra.googlecode.com/files
+PKG_SOURCE_URL:=http://www.lrc.ic.unicamp.br/~luciano/files
 PKG_MD5SUM:=2798fe608c2af674fe21ebc4698c16dd
 
 PKG_SOURCE:=compat-wireless-cogtra-$(PKG_VERSION).tar.bz2
