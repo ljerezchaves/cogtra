@@ -1,4 +1,4 @@
-### CogTRA -- Cognitive Transmission Rate Adaptation for OpenWrt
+#### CogTRA -- Cognitive Transmission Rate Adaptation for OpenWrt
 
 This project comprises the implementation of the Cognitive Transmission Rate Adaptation (CogTRA) into Linux Kernel MAC802.11 layer for the OpenWRT Linux distribution.
 
